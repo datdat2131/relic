@@ -1,0 +1,22 @@
+name: AstraxRelic
+version: '${project.version}'
+main: com.astraxbox.relic.AstraxRelic
+api-version: '1.21'
+author: AstraxBox
+description: Hệ thống Di Vật độc quyền của AstraxBox
+softdepend: [PlaceholderAPI]
+commands:
+  relic:
+    description: Mở menu AstraxRelic
+    aliases: [relics, divat]
+    usage: /relic [codex|sets|top|equip|unequip|upgrade|recycle]
+  relicadmin:
+    description: Lệnh quản trị AstraxRelic
+    usage: /relicadmin <give|remove|material|trigger|reload>
+permissions:
+  astraxrelic.use:
+    description: Dùng hệ thống Relic
+    default: true
+  astraxrelic.admin:
+    description: Quản trị Relic
+    default: op
