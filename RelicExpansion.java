@@ -59,7 +59,7 @@ public final class RelicExpansion extends PlaceholderExpansion {
         if (key.startsWith("slot_")) {
             try {
                 int i = Integer.parseInt(key.substring(5)) - 1;
-                if (i < 0 || i >= 5) return "";
+                if (i < 0 || i >= m.slots) return "";
                 String id;
                 synchronized (d) { id = d.equipped[i]; }
                 RelicDef r = id == null ? null : m.relics.get(id);

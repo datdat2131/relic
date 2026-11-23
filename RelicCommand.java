@@ -2,7 +2,6 @@ package com.astraxbox.relic;
 
 import com.astraxbox.relic.Model.PlayerData;
 import com.astraxbox.relic.Model.RelicDef;
-import com.astraxbox.relic.Model.Trigger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -107,6 +106,7 @@ public final class RelicCommand implements CommandExecutor, TabCompleter {
                 RelicDef r = mgr().relics.get(args[2].toLowerCase(Locale.ROOT));
                 if (r == null) { mgr().msg(sender, "&cKhông có Di Vật &f" + args[2]); return true; }
                 d.removeRelic(r.id);
+                mgr().refresh(target);
                 mgr().msg(sender, "&aĐã xóa &f" + r.id + " &akhỏi &f" + target.getName() + ".");
             }
             case "material" -> {
@@ -120,14 +120,6 @@ public final class RelicCommand implements CommandExecutor, TabCompleter {
                 d.add(mat, amt);
                 mgr().msg(sender, "&aĐã chỉnh &f" + mat + " &a" + (amt >= 0 ? "+" : "") + amt + " cho &f" + target.getName() + ".");
             }
-            case "trigger" -> {
-                if (args.length < 3) { usage(sender); return true; }
-                Trigger t = Trigger.parse(args[2]);
-                if (t == null) { mgr().msg(sender, "&cTrigger không hợp lệ."); return true; }
-                int amt = args.length > 3 ? parse(args[3], 1) : 1;
-                mgr().progress(target, t, amt);
-                mgr().msg(sender, "&aĐã cộng &f" + amt + " " + t.name() + " &acho &f" + target.getName() + ".");
-            }
             default -> usage(sender);
         }
         return true;
@@ -137,7 +129,6 @@ public final class RelicCommand implements CommandExecutor, TabCompleter {
         mgr().msg(s, "&7/relicadmin give <người chơi> <relic> [cấp]");
         mgr().msg(s, "&7/relicadmin remove <người chơi> <relic>");
         mgr().msg(s, "&7/relicadmin material <người chơi> <shard|dust|core> <số>");
-        mgr().msg(s, "&7/relicadmin trigger <người chơi> <trigger> [số]");
         mgr().msg(s, "&7/relicadmin reload");
     }
 
@@ -151,7 +142,7 @@ public final class RelicCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (command.getName().equalsIgnoreCase("relicadmin")) {
             if (!sender.hasPermission("astraxrelic.admin")) return List.of();
-            if (args.length == 1) return filter(List.of("give", "remove", "material", "trigger", "reload"), args[0]);
+            if (args.length == 1) return filter(List.of("give", "remove", "material", "reload"), args[0]);
             if (args.length == 2 && !args[0].equalsIgnoreCase("reload")) {
                 List<String> names = new ArrayList<>();
                 for (Player p : Bukkit.getOnlinePlayers()) names.add(p.getName());
@@ -161,11 +152,6 @@ public final class RelicCommand implements CommandExecutor, TabCompleter {
                 switch (args[0].toLowerCase(Locale.ROOT)) {
                     case "give", "remove" -> { return filter(mgr().relics.keySet(), args[2]); }
                     case "material" -> { return filter(List.of("shard", "dust", "core"), args[2]); }
-                    case "trigger" -> {
-                        List<String> t = new ArrayList<>();
-                        for (Trigger x : Trigger.values()) t.add(x.name());
-                        return filter(t, args[2]);
-                    }
                     default -> { return List.of(); }
                 }
             }

@@ -1,7 +1,6 @@
 package com.astraxbox.relic;
 
 import com.astraxbox.relic.Model.Stat;
-import com.astraxbox.relic.Model.Trigger;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -15,6 +14,8 @@ public final class AstraxRelic extends JavaPlugin {
     private DataStore store;
     private RelicManager manager;
     private RelicGui gui;
+    private long auraTicks;
+    private int seconds;
 
     public static AstraxRelic get() { return instance; }
 
@@ -57,17 +58,26 @@ public final class AstraxRelic extends JavaPlugin {
             }
         }
 
-        for (Player p : Bukkit.getOnlinePlayers()) manager.data(p);
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            manager.data(p);
+            manager.refresh(p);
+        }
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new RelicExpansion(this).register();
             getLogger().info("Đã kết nối PlaceholderAPI.");
         }
 
-        // Mỗi phút online
+        // Aura mỗi 3 tick
         Bukkit.getScheduler().runTaskTimer(this, () -> {
-            for (Player p : Bukkit.getOnlinePlayers()) manager.progress(p, Trigger.ONLINE_MINUTE, 1);
-        }, 1200L, 1200L);
+            auraTicks++;
+            for (Player p : Bukkit.getOnlinePlayers()) manager.auraTick(p, auraTicks);
+        }, 20L, 3L);
+        // Nội tại theo giây (Haste, Hồi Phục)
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            seconds++;
+            for (Player p : Bukkit.getOnlinePlayers()) manager.secondTick(p, seconds);
+        }, 20L, 20L);
         // Tự động lưu mỗi 5 phút
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> manager.saveAll(), 6000L, 6000L);
 
@@ -76,24 +86,17 @@ public final class AstraxRelic extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (manager != null) manager.saveAll();
+        if (manager != null) {
+            for (Player p : Bukkit.getOnlinePlayers()) manager.clear(p);
+            manager.saveAll();
+        }
         if (store != null) store.close();
     }
 
     // ===================== API cho plugin khác =====================
 
-    /** Tổng bonus (đơn vị %) của một chỉ số, ví dụ 12.5 = +12.5%. */
+    /** Tổng bonus của một chỉ số (Máu/Giáp là điểm, Sát thương/Tốc độ là %). */
     public double getBonus(Player p, Stat stat) {
         return manager.bonus(manager.data(p), stat);
-    }
-
-    /** Hệ số nhân, ví dụ bonus 12.5% => 1.125. */
-    public double getMultiplier(Player p, Stat stat) {
-        return 1.0 + getBonus(p, stat) / 100.0;
-    }
-
-    /** Cộng tiến độ cho các Di Vật đang trang bị có trigger tương ứng. */
-    public void progress(Player p, Trigger trigger, int amount) {
-        manager.progress(p, trigger, amount);
     }
 }

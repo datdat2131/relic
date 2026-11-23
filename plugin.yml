@@ -12,7 +12,7 @@ commands:
     usage: /relic [codex|sets|top|equip|unequip|upgrade|recycle]
   relicadmin:
     description: Lệnh quản trị AstraxRelic
-    usage: /relicadmin <give|remove|material|trigger|reload>
+    usage: /relicadmin <give|remove|material|reload>
 permissions:
   astraxrelic.use:
     description: Dùng hệ thống Relic

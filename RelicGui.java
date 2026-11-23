@@ -1,5 +1,6 @@
 package com.astraxbox.relic;
 
+import com.astraxbox.relic.Model.ActivePassive;
 import com.astraxbox.relic.Model.PlayerData;
 import com.astraxbox.relic.Model.RarityInfo;
 import com.astraxbox.relic.Model.RelicDef;
@@ -39,7 +40,7 @@ public final class RelicGui implements Listener {
         public Inventory getInventory() { return inv; }
     }
 
-    private static final int[] EQUIP_SLOTS = {11, 12, 13, 14, 15};
+    private static final int[] EQUIP_SLOTS = {11, 13, 15};
     private static final int[] SET_SLOTS = {10, 11, 12, 13, 14, 15, 16};
     private static final int[] CODEX_SLOTS = new int[28];
 
@@ -94,7 +95,7 @@ public final class RelicGui implements Listener {
         PlayerData d = mgr().data(p);
         fillAll(inv);
         inv.setItem(4, item(Material.NETHER_STAR, "&b✦ AstraxRelic ✦", materialLore(d), false));
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < EQUIP_SLOTS.length; i++) {
             int slot = EQUIP_SLOTS[i];
             if (i >= mgr().slots) {
                 inv.setItem(slot, item(Material.RED_STAINED_GLASS_PANE, "&cSlot bị khóa", null, false));
@@ -159,7 +160,7 @@ public final class RelicGui implements Listener {
             if (idx >= SET_SLOTS.length) break;
             int count = mgr().setCount(d, set.id);
             List<String> lore = new ArrayList<>();
-            lore.add("&7Đang trang bị: &f" + count);
+            lore.add("&7Đang trang bị: &f" + count + "&7/3");
             lore.add("");
             lore.add("&6Thành viên:");
             for (RelicDef r : mgr().relics.values()) {
@@ -176,7 +177,7 @@ public final class RelicGui implements Listener {
                 StringBuilder sb = new StringBuilder();
                 for (Map.Entry<Stat, Double> s : b.getValue().entrySet()) {
                     if (sb.length() > 0) sb.append(", ");
-                    sb.append('+').append(RelicManager.fmt(s.getValue())).append("% ").append(s.getKey().display);
+                    sb.append(s.getKey().line(s.getValue()));
                 }
                 lore.add((active ? "&a[✔] " : "&8[ ] ") + (active ? "&f" : "&7") + b.getKey() + " món: " + (active ? "&a" : "&7") + sb);
             }
@@ -202,22 +203,24 @@ public final class RelicGui implements Listener {
         l.add("");
         int shown = Math.max(1, lv);
         for (Map.Entry<Stat, Double> e : r.stats.entrySet()) {
-            l.add("&a+" + RelicManager.fmt(mgr().statValue(e.getValue(), shown)) + "% &f" + e.getKey().display);
+            l.add("&a" + e.getKey().line(mgr().statValue(e.getValue(), shown)));
         }
         l.add("");
-        l.add("&7Cơ chế: &fmỗi &e" + r.chargeNeeded + " &f" + r.trigger.display);
-        StringBuilder rw = new StringBuilder();
-        if (r.rewardShard > 0) rw.append("&b+").append(r.rewardShard).append(" Shard ");
-        if (r.rewardDust > 0) rw.append("&e+").append(r.rewardDust).append(" Dust ");
-        if (r.rewardCore > 0) rw.append("&d+").append(r.rewardCore).append(" Core ");
-        if (!r.rewardCommands.isEmpty()) rw.append("&f+quà đặc biệt");
-        if (rw.length() > 0) l.add("&7Thưởng: " + rw);
+        if (r.passive != null) {
+            boolean unlocked = owned && lv >= r.passive.unlockLevel;
+            if (unlocked) {
+                double v = r.passive.type.scales ? mgr().statValue(r.passive.value, lv) : r.passive.value;
+                l.add("&d✦ Nội tại: &f" + r.passive.type.display);
+                l.add("&7  " + r.passive.type.describe(v, r.passive.chance, r.passive.cooldown));
+            } else {
+                l.add("&8✦ Nội tại ẩn: &8&k???????");
+                l.add("&8  Mở khóa ở cấp " + r.passive.unlockLevel);
+            }
+        }
+        if (r.aura != null) l.add("&7Hiệu ứng: &f" + r.aura.style.display);
         l.add("");
         if (owned) {
             l.add("&7Cấp: &f" + lv + "&7/&f" + mgr().maxLevel + (eq ? "  &a(Đang trang bị)" : ""));
-            int charge;
-            synchronized (d) { charge = d.charge.getOrDefault(r.id, 0); }
-            l.add("&7Tiến độ: &f" + charge + "&7/&f" + r.chargeNeeded);
             if (lv < mgr().maxLevel) {
                 int dust = mgr().upgradeDust(r, lv);
                 int cores = mgr().upgradeCores(r, lv);
@@ -251,11 +254,17 @@ public final class RelicGui implements Listener {
         for (Stat s : Stat.values()) {
             double v = b.getOrDefault(s, 0.0);
             if (v > 0) {
-                l.add("&a+" + RelicManager.fmt(v) + "% &f" + s.display);
+                l.add("&a" + s.line(v));
                 any = true;
             }
         }
         if (!any) l.add("&7Chưa có chỉ số nào. Hãy trang bị Di Vật!");
+        List<ActivePassive> ps = mgr().passives(d);
+        if (!ps.isEmpty()) {
+            l.add("");
+            l.add("&dNội tại đang hoạt động:");
+            for (ActivePassive a : ps) l.add("&7• &f" + a.type.display);
+        }
         return l;
     }
 
@@ -280,11 +289,12 @@ public final class RelicGui implements Listener {
 
     private static String groupName(String g) {
         return switch (g) {
-            case "MINING" -> "Khai thác";
-            case "COMBAT" -> "Chiến đấu";
-            case "ECONOMY" -> "Kinh tế";
-            case "FUN" -> "Độc lạ";
-            default -> "Tiện ích";
+            case "ATTACK" -> "Công kích";
+            case "GUARD" -> "Phòng thủ";
+            case "VITAL" -> "Sinh lực";
+            case "SWIFT" -> "Tốc độ";
+            case "MINER" -> "Thợ mỏ";
+            default -> "Huyền bí";
         };
     }
 

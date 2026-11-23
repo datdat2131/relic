@@ -1,13 +1,17 @@
 package com.astraxbox.relic;
 
+import com.astraxbox.relic.Model.ActivePassive;
+import com.astraxbox.relic.Model.AuraDef;
+import com.astraxbox.relic.Model.AuraStyle;
 import com.astraxbox.relic.Model.DropRule;
+import com.astraxbox.relic.Model.Passive;
+import com.astraxbox.relic.Model.PassiveDef;
 import com.astraxbox.relic.Model.PlayerData;
 import com.astraxbox.relic.Model.Rarity;
 import com.astraxbox.relic.Model.RarityInfo;
 import com.astraxbox.relic.Model.RelicDef;
 import com.astraxbox.relic.Model.RelicSet;
 import com.astraxbox.relic.Model.Stat;
-import com.astraxbox.relic.Model.Trigger;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -19,18 +23,29 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
+import org.bukkit.Registry;
 import org.bukkit.Sound;
+import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
-/** Toàn bộ logic: đọc config, chỉ số, chế tạo, nâng cấp, trang bị, tái chế, tiến độ, rơi nguyên liệu. */
+/** Logic chính: config, chỉ số, nội tại ẩn, aura, chế tạo, nâng cấp, trang bị, tái chế, rơi nguyên liệu. */
 public final class RelicManager {
     private final AstraxRelic plugin;
 
@@ -38,16 +53,26 @@ public final class RelicManager {
     public final Map<String, RelicSet> sets = new LinkedHashMap<>();
     public final Map<Rarity, RarityInfo> rarities = new EnumMap<>(Rarity.class);
     private final Map<String, List<DropRule>> drops = new HashMap<>();
+    private final Map<Stat, Double> caps = new EnumMap<>(Stat.class);
     private final Map<UUID, PlayerData> cache = new ConcurrentHashMap<>();
+    private final Map<UUID, Location> lastLoc = new ConcurrentHashMap<>();
 
-    public int slots = 5;
+    private final NamespacedKey keyHealth;
+    private final NamespacedKey keyArmor;
+    private final NamespacedKey keySpeed;
+    private Attribute attrHealth;
+    private Attribute attrArmor;
+    private Attribute attrSpeed;
+
+    public int slots = 3;
     public int maxLevel = 30;
     public double levelScale = 0.04;
     public double dustBase = 10;
     public double dustGrowth = 0.15;
     public double refundRatio = 0.5;
-    public double maxMoneyBonus = 10;
     public double bossMinHealth = 100;
+    public double lifestealCap = 4;
+    public boolean auraEnabled = true;
     public List<String> mineable = new ArrayList<>();
     public List<String> bossTypes = new ArrayList<>();
     public List<String> bossNames = new ArrayList<>();
@@ -55,6 +80,9 @@ public final class RelicManager {
 
     public RelicManager(AstraxRelic plugin) {
         this.plugin = plugin;
+        this.keyHealth = new NamespacedKey(plugin, "relic_health");
+        this.keyArmor = new NamespacedKey(plugin, "relic_armor");
+        this.keySpeed = new NamespacedKey(plugin, "relic_speed");
     }
 
     // ===================== Config =====================
@@ -66,12 +94,18 @@ public final class RelicManager {
         sets.clear();
         rarities.clear();
         drops.clear();
+        caps.clear();
+
+        attrHealth = findAttr("max_health", "generic.max_health");
+        attrArmor = findAttr("armor", "generic.armor");
+        attrSpeed = findAttr("movement_speed", "generic.movement_speed");
 
         prefix = c.getString("messages.prefix", "&8[&bAstraxRelic&8] &7");
-        slots = Math.max(1, Math.min(5, c.getInt("settings.slots", 5)));
+        slots = Math.max(1, Math.min(3, c.getInt("settings.slots", 3)));
         maxLevel = Math.max(1, c.getInt("settings.max-level", 30));
         levelScale = c.getDouble("settings.level-scale", 0.04);
-        maxMoneyBonus = c.getDouble("settings.max-money-bonus", 10);
+        auraEnabled = c.getBoolean("settings.aura-enabled", true);
+        lifestealCap = c.getDouble("settings.lifesteal-cap-per-hit", 4);
         dustBase = c.getDouble("upgrade.dust-base", 10);
         dustGrowth = c.getDouble("upgrade.dust-growth", 0.15);
         refundRatio = c.getDouble("recycle.refund-ratio", 0.5);
@@ -79,6 +113,11 @@ public final class RelicManager {
         bossMinHealth = c.getDouble("boss.min-health", 100);
         bossTypes = upper(c.getStringList("boss.types"));
         bossNames = lower(c.getStringList("boss.name-keywords"));
+
+        caps.put(Stat.HEALTH, c.getDouble("caps.HEALTH", 40));
+        caps.put(Stat.DAMAGE, c.getDouble("caps.DAMAGE", 100));
+        caps.put(Stat.ARMOR, c.getDouble("caps.ARMOR", 16));
+        caps.put(Stat.SPEED, c.getDouble("caps.SPEED", 40));
 
         for (Rarity r : Rarity.values()) {
             ConfigurationSection s = c.getConfigurationSection("rarities." + r.name());
@@ -102,21 +141,29 @@ public final class RelicManager {
                 RelicDef r = new RelicDef();
                 r.id = id.toLowerCase(Locale.ROOT);
                 r.name = s.getString("name", id);
-                r.group = s.getString("group", "UTILITY").toUpperCase(Locale.ROOT);
+                r.group = s.getString("group", "MYSTIC").toUpperCase(Locale.ROOT);
                 r.set = s.getString("set", "").toLowerCase(Locale.ROOT);
                 try { r.rarity = Rarity.valueOf(s.getString("rarity", "COMMON").toUpperCase(Locale.ROOT)); }
                 catch (IllegalArgumentException e) { r.rarity = Rarity.COMMON; }
                 Material m = Material.matchMaterial(s.getString("icon", "PAPER"));
                 r.icon = m != null ? m : Material.PAPER;
                 r.description = s.getStringList("description");
-                Trigger t = Trigger.parse(s.getString("trigger", "BLOCK_BREAK"));
-                r.trigger = t != null ? t : Trigger.BLOCK_BREAK;
-                r.chargeNeeded = Math.max(1, s.getInt("charge-needed", 100));
-                r.rewardShard = s.getInt("reward.shard", 0);
-                r.rewardDust = s.getInt("reward.dust", 0);
-                r.rewardCore = s.getInt("reward.core", 0);
-                r.rewardCommands = s.getStringList("reward-commands");
                 r.stats = readStats(s.getConfigurationSection("stats"));
+                ConfigurationSection ps = s.getConfigurationSection("passive");
+                if (ps != null) {
+                    try {
+                        PassiveDef pd = new PassiveDef();
+                        pd.type = Passive.valueOf(ps.getString("type", "").toUpperCase(Locale.ROOT));
+                        pd.value = ps.getDouble("value", 0);
+                        pd.chance = ps.getDouble("chance", 0);
+                        pd.cooldown = ps.getInt("cooldown", 0);
+                        pd.unlockLevel = ps.getInt("unlock-level", 10);
+                        r.passive = pd;
+                    } catch (IllegalArgumentException e) {
+                        plugin.getLogger().warning("Nội tại sai ở relic " + id);
+                    }
+                }
+                r.aura = readAura(s.getConfigurationSection("aura"));
                 relics.put(r.id, r);
             }
         }
@@ -131,6 +178,7 @@ public final class RelicManager {
                 set.name = s.getString("name", id);
                 Material m = Material.matchMaterial(s.getString("icon", "AMETHYST_SHARD"));
                 set.icon = m != null ? m : Material.AMETHYST_SHARD;
+                set.aura = readAura(s.getConfigurationSection("aura"));
                 ConfigurationSection bs = s.getConfigurationSection("bonuses");
                 if (bs != null) {
                     for (String k : bs.getKeys(false)) {
@@ -164,7 +212,16 @@ public final class RelicManager {
             }
         }
 
-        for (PlayerData d : cache.values()) d.cache = null;
+        for (PlayerData d : cache.values()) d.invalidate();
+        for (Player p : plugin.getServer().getOnlinePlayers()) refresh(p);
+    }
+
+    private Attribute findAttr(String... names) {
+        for (String n : names) {
+            Attribute a = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(n));
+            if (a != null) return a;
+        }
+        return null;
     }
 
     private Map<Stat, Double> readStats(ConfigurationSection s) {
@@ -175,6 +232,21 @@ public final class RelicManager {
             if (st != null) m.put(st, s.getDouble(k));
         }
         return m;
+    }
+
+    private AuraDef readAura(ConfigurationSection s) {
+        if (s == null) return null;
+        AuraDef a = new AuraDef();
+        try { a.particle = Particle.valueOf(s.getString("particle", "END_ROD").toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException e) { a.particle = Particle.END_ROD; }
+        try { a.style = AuraStyle.valueOf(s.getString("style", "RING").toUpperCase(Locale.ROOT)); }
+        catch (IllegalArgumentException e) { a.style = AuraStyle.RING; }
+        String col = s.getString("color", "");
+        if (!col.isEmpty()) {
+            try { a.color = Color.fromRGB(Integer.parseInt(col.replace("#", ""), 16)); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        return a;
     }
 
     private static List<String> upper(List<String> in) {
@@ -208,6 +280,7 @@ public final class RelicManager {
     }
 
     public void unload(Player p) {
+        lastLoc.remove(p.getUniqueId());
         PlayerData d = cache.remove(p.getUniqueId());
         if (d != null) plugin.store().save(d);
     }
@@ -216,7 +289,7 @@ public final class RelicManager {
         for (PlayerData d : cache.values()) plugin.store().save(d);
     }
 
-    // ===================== Chỉ số =====================
+    // ===================== Chỉ số & thuộc tính =====================
 
     public double statValue(double base, int level) {
         return base * (1.0 + (Math.max(1, level) - 1) * levelScale);
@@ -233,22 +306,28 @@ public final class RelicManager {
         return n;
     }
 
+    public List<RelicDef> equippedDefs(PlayerData d) {
+        List<RelicDef> out = new ArrayList<>();
+        synchronized (d) {
+            for (int i = 0; i < Math.min(slots, d.equipped.length); i++) {
+                RelicDef r = d.equipped[i] == null ? null : relics.get(d.equipped[i]);
+                if (r != null) out.add(r);
+            }
+        }
+        return out;
+    }
+
     public Map<Stat, Double> bonuses(PlayerData d) {
         Map<Stat, Double> cached = d.cache;
         if (cached != null) return cached;
         Map<Stat, Double> m = new EnumMap<>(Stat.class);
         Map<String, Integer> setCounts = new HashMap<>();
-        synchronized (d) {
-            for (int i = 0; i < Math.min(slots, d.equipped.length); i++) {
-                String id = d.equipped[i];
-                RelicDef r = id == null ? null : relics.get(id);
-                if (r == null) continue;
-                int lv = Math.max(1, d.level(id));
-                for (Map.Entry<Stat, Double> e : r.stats.entrySet()) {
-                    m.merge(e.getKey(), statValue(e.getValue(), lv), Double::sum);
-                }
-                if (!r.set.isEmpty()) setCounts.merge(r.set, 1, Integer::sum);
+        for (RelicDef r : equippedDefs(d)) {
+            int lv = Math.max(1, d.level(r.id));
+            for (Map.Entry<Stat, Double> e : r.stats.entrySet()) {
+                m.merge(e.getKey(), statValue(e.getValue(), lv), Double::sum);
             }
+            if (!r.set.isEmpty()) setCounts.merge(r.set, 1, Integer::sum);
         }
         for (Map.Entry<String, Integer> e : setCounts.entrySet()) {
             RelicSet set = sets.get(e.getKey());
@@ -261,13 +340,203 @@ public final class RelicManager {
                 }
             }
         }
-        m.computeIfPresent(Stat.MONEY, (k, v) -> Math.min(v, maxMoneyBonus));
+        for (Map.Entry<Stat, Double> cap : caps.entrySet()) {
+            m.computeIfPresent(cap.getKey(), (k, v) -> Math.min(v, cap.getValue()));
+        }
         d.cache = m;
         return m;
     }
 
     public double bonus(PlayerData d, Stat s) {
         return bonuses(d).getOrDefault(s, 0.0);
+    }
+
+    /** Áp Máu / Giáp / Tốc độ lên người chơi (sát thương xử lý trong listener). */
+    public void refresh(Player p) {
+        PlayerData d = data(p);
+        Map<Stat, Double> b = bonuses(d);
+        setMod(p, attrHealth, keyHealth, b.getOrDefault(Stat.HEALTH, 0.0), AttributeModifier.Operation.ADD_NUMBER);
+        setMod(p, attrArmor, keyArmor, b.getOrDefault(Stat.ARMOR, 0.0), AttributeModifier.Operation.ADD_NUMBER);
+        setMod(p, attrSpeed, keySpeed, b.getOrDefault(Stat.SPEED, 0.0) / 100.0, AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        double max = maxHealth(p);
+        if (p.getHealth() > max) p.setHealth(max);
+    }
+
+    public void clear(Player p) {
+        setMod(p, attrHealth, keyHealth, 0, AttributeModifier.Operation.ADD_NUMBER);
+        setMod(p, attrArmor, keyArmor, 0, AttributeModifier.Operation.ADD_NUMBER);
+        setMod(p, attrSpeed, keySpeed, 0, AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        double max = maxHealth(p);
+        if (p.getHealth() > max) p.setHealth(max);
+    }
+
+    private void setMod(Player p, Attribute attr, NamespacedKey key, double amount, AttributeModifier.Operation op) {
+        if (attr == null) return;
+        AttributeInstance inst = p.getAttribute(attr);
+        if (inst == null) return;
+        for (AttributeModifier mod : new ArrayList<>(inst.getModifiers())) {
+            if (mod.getKey().equals(key)) inst.removeModifier(mod);
+        }
+        if (amount != 0) inst.addTransientModifier(new AttributeModifier(key, amount, op, EquipmentSlotGroup.ANY));
+    }
+
+    public double maxHealth(Player p) {
+        AttributeInstance i = attrHealth == null ? null : p.getAttribute(attrHealth);
+        return i == null ? 20.0 : i.getValue();
+    }
+
+    public void heal(Player p, double amt) {
+        if (amt <= 0 || p.isDead()) return;
+        p.setHealth(Math.min(maxHealth(p), p.getHealth() + amt));
+    }
+
+    // ===================== Nội tại ẩn =====================
+
+    public List<ActivePassive> passives(PlayerData d) {
+        List<ActivePassive> c = d.passiveCache;
+        if (c != null) return c;
+        List<ActivePassive> out = new ArrayList<>();
+        for (RelicDef r : equippedDefs(d)) {
+            if (r.passive == null) continue;
+            int lv = d.level(r.id);
+            if (lv < r.passive.unlockLevel) continue;
+            double v = r.passive.type.scales ? statValue(r.passive.value, lv) : r.passive.value;
+            out.add(new ActivePassive(r.passive.type, v, r.passive.chance, r.passive.cooldown, r.id));
+        }
+        d.passiveCache = out;
+        return out;
+    }
+
+    public double passiveSum(List<ActivePassive> list, Passive t) {
+        double sum = 0;
+        for (ActivePassive a : list) if (a.type == t) sum += a.value;
+        return sum;
+    }
+
+    /** Kiểm tra hồi chiêu và tiêu thụ nếu dùng được. */
+    public boolean tryUse(PlayerData d, ActivePassive a) {
+        if (a.cooldown <= 0) return true;
+        long now = System.currentTimeMillis();
+        Long ready = d.cooldowns.get(a.relicId);
+        if (ready != null && ready > now) return false;
+        d.cooldowns.put(a.relicId, now + a.cooldown * 1000L);
+        return true;
+    }
+
+    public void onKill(Player p) {
+        PlayerData d = data(p);
+        for (ActivePassive a : passives(d)) {
+            if (a.type == Passive.KILL_HEAL) {
+                heal(p, a.value);
+            } else if (a.type == Passive.KILL_SPEED) {
+                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, (int) (a.value * 20), 1, true, true, true));
+            }
+        }
+    }
+
+    /** Gọi mỗi giây cho mỗi người chơi. */
+    public void secondTick(Player p, int sec) {
+        PlayerData d = data(p);
+        List<ActivePassive> ps = passives(d);
+        if (ps.isEmpty()) return;
+        int haste = -1;
+        double regen = 0;
+        for (ActivePassive a : ps) {
+            if (a.type == Passive.HASTE) haste = Math.max(haste, (int) a.value);
+            else if (a.type == Passive.REGEN) regen += a.value;
+        }
+        if (haste >= 0) p.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 60, haste, true, false, false));
+        if (regen > 0 && sec % 5 == 0) heal(p, regen);
+    }
+
+    // ===================== Aura (hiệu ứng đặc trưng) =====================
+
+    public void auraTick(Player p, long tick) {
+        if (!auraEnabled || p.getGameMode() == GameMode.SPECTATOR || p.hasPotionEffect(PotionEffectType.INVISIBILITY)) return;
+        PlayerData d = data(p);
+        List<RelicDef> eq = equippedDefs(d);
+        if (eq.isEmpty()) return;
+        Location loc = p.getLocation();
+        Location prev = lastLoc.put(p.getUniqueId(), loc);
+        boolean moved = prev != null && prev.getWorld() == loc.getWorld() && prev.distanceSquared(loc) > 0.01;
+        for (RelicDef r : eq) {
+            if (r.aura != null) drawAura(loc, r.aura, tick, moved, 1 + r.rarity.ordinal() / 2);
+        }
+        for (RelicSet s : sets.values()) {
+            if (s.aura != null && setCount(d, s.id) >= 3) drawAura(loc, s.aura, tick + 9, moved, 2);
+        }
+    }
+
+    private void drawAura(Location base, AuraDef a, long tick, boolean moved, int intensity) {
+        World w = base.getWorld();
+        if (w == null) return;
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        double t = tick * 0.35;
+        switch (a.style) {
+            case RING -> {
+                int n = 2 + intensity;
+                for (int i = 0; i < n; i++) {
+                    double ang = t + i * (2 * Math.PI / n);
+                    spawn(w, base.clone().add(Math.cos(ang) * 0.8, 0.15, Math.sin(ang) * 0.8), a, 1);
+                }
+            }
+            case ORBIT -> {
+                int n = 1 + intensity;
+                double y = 1.0 + 0.3 * Math.sin(t);
+                for (int i = 0; i < n; i++) {
+                    double ang = t * 1.3 + i * (2 * Math.PI / n);
+                    spawn(w, base.clone().add(Math.cos(ang) * 0.9, y, Math.sin(ang) * 0.9), a, 1);
+                }
+            }
+            case HALO -> {
+                for (int i = 0; i < 4; i++) {
+                    double ang = t * 0.8 + i * (Math.PI / 2);
+                    spawn(w, base.clone().add(Math.cos(ang) * 0.4, 2.25, Math.sin(ang) * 0.4), a, 1);
+                }
+            }
+            case HELIX -> {
+                double y = (tick * 0.07) % 2.0;
+                for (int k = 0; k < 2; k++) {
+                    double ang = t + k * Math.PI;
+                    spawn(w, base.clone().add(Math.cos(ang) * 0.7, y, Math.sin(ang) * 0.7), a, 1);
+                }
+            }
+            case SPARK -> {
+                for (int i = 0; i < intensity + 1; i++) {
+                    spawn(w, base.clone().add((rnd.nextDouble() - 0.5) * 1.2, 0.1 + rnd.nextDouble() * 1.8,
+                            (rnd.nextDouble() - 0.5) * 1.2), a, 1);
+                }
+            }
+            case TRAIL -> {
+                if (moved) {
+                    for (int i = 0; i < intensity + 1; i++) {
+                        spawn(w, base.clone().add((rnd.nextDouble() - 0.5) * 0.3, 0.1, (rnd.nextDouble() - 0.5) * 0.3), a, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    private void spawn(World w, Location l, AuraDef a, int count) {
+        try {
+            if (a.particle == Particle.DUST) {
+                w.spawnParticle(Particle.DUST, l, count, 0, 0, 0, 0,
+                        new Particle.DustOptions(a.color != null ? a.color : Color.WHITE, 1.0f));
+            } else {
+                w.spawnParticle(a.particle, l, count, 0, 0, 0, 0);
+            }
+        } catch (IllegalArgumentException ignored) { }
+    }
+
+    private void equipBurst(Player p, RelicDef r) {
+        p.playSound(p.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.6f, 1.6f);
+        if (r.aura == null) return;
+        World w = p.getWorld();
+        Location base = p.getLocation();
+        for (int i = 0; i < 28; i++) {
+            double ang = i * 0.5;
+            spawn(w, base.clone().add(Math.cos(ang) * 0.9, i * 0.075, Math.sin(ang) * 0.9), r.aura, 2);
+        }
     }
 
     // ===================== Chi phí =====================
@@ -323,6 +592,11 @@ public final class RelicManager {
         d.setLevel(r.id, lv + 1);
         msg(p, "&aNâng cấp " + rarities.get(r.rarity).color + r.name + " &alên cấp &f" + (lv + 1) + "&a.");
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.6f, 1.5f);
+        if (r.passive != null && lv + 1 == r.passive.unlockLevel) {
+            msg(p, "&d✦ Nội tại ẩn đã mở khóa: &f" + r.passive.type.display + "&d!");
+            p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8f, 1.0f);
+        }
+        refresh(p);
         return true;
     }
 
@@ -331,10 +605,11 @@ public final class RelicManager {
         if (!d.owns(r.id)) { msg(p, "&cBạn chưa sở hữu Di Vật này."); return false; }
         if (d.isEquipped(r.id)) { msg(p, "&eDi Vật này đang được trang bị."); return false; }
         int slot = d.freeSlot(slots);
-        if (slot < 0) { msg(p, "&cĐã hết slot. Hãy tháo một Di Vật trước."); return false; }
+        if (slot < 0) { msg(p, "&cChỉ trang bị được &f" + slots + " &cDi Vật. Hãy tháo một cái trước."); return false; }
         d.equipAt(slot, r.id);
         msg(p, "&aĐã trang bị " + rarities.get(r.rarity).color + r.name + "&a vào slot " + (slot + 1) + ".");
-        p.playSound(p.getLocation(), Sound.ITEM_ARMOR_EQUIP_DIAMOND, 0.8f, 1.2f);
+        refresh(p);
+        equipBurst(p, r);
         return true;
     }
 
@@ -344,6 +619,7 @@ public final class RelicManager {
         d.unequip(r.id);
         msg(p, "&7Đã tháo " + rarities.get(r.rarity).color + r.name + "&7.");
         p.playSound(p.getLocation(), Sound.ITEM_ARMOR_EQUIP_GENERIC, 0.8f, 1.0f);
+        refresh(p);
         return true;
     }
 
@@ -372,48 +648,13 @@ public final class RelicManager {
         return true;
     }
 
-    /** Dùng cho Admin: cấp Di Vật với cấp độ chỉ định. */
     public void grant(Player target, RelicDef r, int level) {
         PlayerData d = data(target);
         d.setLevel(r.id, Math.max(1, Math.min(maxLevel, level)));
+        refresh(target);
     }
 
-    // ===================== Tiến độ & phần thưởng =====================
-
-    public void progress(Player p, Trigger t, int amount) {
-        if (amount <= 0) return;
-        PlayerData d = data(p);
-        List<RelicDef> done = new ArrayList<>();
-        synchronized (d) {
-            for (int i = 0; i < Math.min(slots, d.equipped.length); i++) {
-                String id = d.equipped[i];
-                RelicDef r = id == null ? null : relics.get(id);
-                if (r == null || r.trigger != t) continue;
-                int cur = d.charge.getOrDefault(id, 0) + amount;
-                int loops = 0;
-                while (cur >= r.chargeNeeded && loops++ < 20) {
-                    cur -= r.chargeNeeded;
-                    done.add(r);
-                }
-                d.charge.put(id, Math.min(cur, r.chargeNeeded - 1));
-            }
-        }
-        for (RelicDef r : done) complete(p, d, r);
-    }
-
-    private void complete(Player p, PlayerData d, RelicDef r) {
-        StringBuilder rw = new StringBuilder();
-        if (r.rewardShard > 0) { d.add("shard", r.rewardShard); rw.append("&b+").append(r.rewardShard).append(" Shard "); }
-        if (r.rewardDust > 0) { d.add("dust", r.rewardDust); rw.append("&e+").append(r.rewardDust).append(" Dust "); }
-        if (r.rewardCore > 0) { d.add("core", r.rewardCore); rw.append("&d+").append(r.rewardCore).append(" Core "); }
-        for (String cmd : r.rewardCommands) {
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd.replace("%player%", p.getName()));
-        }
-        String color = rarities.get(r.rarity).color;
-        p.sendActionBar(AstraxRelic.c(color + r.name + " &7kích hoạt! " + rw));
-        p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6f, 1.4f);
-        p.spawnParticle(Particle.ENCHANT, p.getLocation().add(0, 1, 0), 25, 0.4, 0.5, 0.4, 0.6);
-    }
+    // ===================== Nguyên liệu rơi =====================
 
     public static String materialName(String mat) {
         return switch (mat) {
@@ -423,12 +664,11 @@ public final class RelicManager {
         };
     }
 
-    /** Roll nguyên liệu rơi theo nguồn: block-break, mob-kill, boss-kill. */
     public void rollDrops(Player p, String source) {
         List<DropRule> rules = drops.get(source);
         if (rules == null || rules.isEmpty()) return;
         PlayerData d = data(p);
-        double luck = 1.0 + bonus(d, Stat.MATERIAL_LUCK) / 100.0;
+        double luck = 1.0 + passiveSum(passives(d), Passive.MATERIAL_LUCK) / 100.0;
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         StringBuilder sb = new StringBuilder();
         for (DropRule dr : rules) {

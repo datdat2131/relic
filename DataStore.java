@@ -62,7 +62,6 @@ public final class DataStore {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         d.levels.put(rs.getString(1), rs.getInt(2));
-                        d.charge.put(rs.getString(1), rs.getInt(3));
                     }
                 }
             }
@@ -101,7 +100,7 @@ public final class DataStore {
                     ins.setString(1, d.uuid.toString());
                     ins.setString(2, e.getKey());
                     ins.setInt(3, e.getValue());
-                    ins.setInt(4, d.charge.getOrDefault(e.getKey(), 0));
+                    ins.setInt(4, 0);
                     ins.addBatch();
                 }
                 ins.executeBatch();

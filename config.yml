@@ -1,25 +1,35 @@
 # ============================================================
 #  AstraxRelic - Hệ thống Di Vật độc quyền của AstraxBox
 #  Mã màu dùng dấu & (vd: &a, &b, &6).
+#  Buff chỉ gồm: HEALTH (máu, 2 = 1 tim), DAMAGE (%), ARMOR (điểm), SPEED (%)
+#  + Nội tại ẩn (mở khóa theo cấp) + Aura riêng để người khác nhìn thấy.
 # ============================================================
 
 messages:
   prefix: "&8[&bAstraxRelic&8] &7"
 
 settings:
-  slots: 5               # số slot trang bị (1-5)
+  slots: 3                    # số Di Vật trang bị cùng lúc (1-3)
   max-level: 30
-  level-scale: 0.04      # chỉ số = base * (1 + (level-1) * level-scale)
-  max-money-bonus: 10    # trần % bonus tiền (chống lạm phát kinh tế)
+  level-scale: 0.04           # chỉ số = base * (1 + (level-1) * level-scale)
+  aura-enabled: true          # bật/tắt hiệu ứng particle
+  lifesteal-cap-per-hit: 4    # hút máu tối đa mỗi đòn (máu)
+
+# Trần tổng chỉ số (đã gồm bonus bộ Set) để cân bằng server
+caps:
+  HEALTH: 40                  # +40 máu = +20 tim
+  DAMAGE: 100                 # +100%
+  ARMOR: 16
+  SPEED: 40                   # +40%
 
 upgrade:
-  dust-base: 10          # Dust cần = dust-base * (1 + level * dust-growth) * cost-mult
+  dust-base: 10               # Dust cần = dust-base * (1 + level * dust-growth) * cost-mult
   dust-growth: 0.15
 
 recycle:
-  refund-ratio: 0.5      # hoàn lại 50% nguyên liệu khi tái chế
+  refund-ratio: 0.5
 
-# Block nào được tính là "đào mỏ" (tên Material chứa một trong các từ này)
+# Block nào tính là "đào mỏ" để rơi nguyên liệu (tên Material chứa từ này)
 mining:
   mineable-tokens: [ORE, STONE, DEEPSLATE, ANCIENT_DEBRIS, NETHERRACK, OBSIDIAN, BASALT, BLACKSTONE]
 
@@ -29,7 +39,6 @@ boss:
   types: [WITHER, ENDER_DRAGON, WARDEN, ELDER_GUARDIAN]
   name-keywords: ["Boss"]
 
-# Độ hiếm
 rarities:
   COMMON:
     name: "Thường"
@@ -37,7 +46,7 @@ rarities:
     craft-shards: 20
     craft-cores: 0
     cost-mult: 1.0
-    milestone-cores: 0     # Core cần khi nâng từ cấp 10, 20 (bội của 10)
+    milestone-cores: 0        # Core cần khi nâng từ cấp 10, 20
   RARE:
     name: "Hiếm"
     color: "&9"
@@ -67,11 +76,11 @@ rarities:
   CELESTIAL:
     name: "Thiên Giới"
     color: "&b"
-    craftable: false       # chỉ nhận từ sự kiện / Admin
+    craftable: false          # chỉ nhận từ sự kiện / Admin
     cost-mult: 7.0
     milestone-cores: 8
 
-# Nguyên liệu rơi (chance 0.01 = 1%). Chỉ số MATERIAL_LUCK nhân thêm vào tỉ lệ.
+# Nguyên liệu rơi (chance 0.01 = 1%). Nội tại MATERIAL_LUCK nhân thêm vào tỉ lệ.
 drops:
   block-break:
     dust:  {chance: 0.012,  min: 1, max: 2}
@@ -86,279 +95,263 @@ drops:
     shard: {chance: 1.0,  min: 3, max: 6}
     core:  {chance: 0.25, min: 1, max: 2}
 
-# Bộ Relic (Set Bonus). Key là số món cần trang bị.
+# Bộ Relic. Key là số món cần trang bị (tối đa 3 vì chỉ có 3 slot).
+# Trang bị đủ 3 món cùng bộ: nhận bonus + aura riêng của bộ.
 sets:
   frostborn:
     name: "&b❄ Frostborn"
     icon: BLUE_ICE
+    aura: {particle: SNOWFLAKE, style: HELIX}
     bonuses:
-      2: {MINING_EXP: 3}
-      3: {MINING_EXP: 5, MATERIAL_LUCK: 5}
-      4: {MINING_EXP: 8, EVENT_POINTS: 5}
+      2: {SPEED: 2, HEALTH: 2}
+      3: {SPEED: 4, HEALTH: 4, ARMOR: 1}
   infernal:
     name: "&c🔥 Infernal"
     icon: MAGMA_CREAM
+    aura: {particle: FLAME, style: RING}
     bonuses:
-      2: {COMBAT_EXP: 3}
-      3: {COMBAT_EXP: 5, QUEST_POINTS: 3}
-      4: {COMBAT_EXP: 8, BOSS_CONTRIBUTION: 5}
-  astral:
-    name: "&d✦ Astral"
-    icon: AMETHYST_SHARD
-    bonuses:
-      2: {EVENT_POINTS: 3}
-      3: {EVENT_POINTS: 5, TREASURE: 5}
-      4: {EVENT_POINTS: 8, MATERIAL_LUCK: 8}
-  fortune:
-    name: "&6$ Fortune"
-    icon: GOLD_INGOT
-    bonuses:
-      2: {MONEY: 2}
-      3: {MONEY: 3, TREASURE: 5}
-      4: {MONEY: 5, QUEST_POINTS: 5}
+      2: {DAMAGE: 4}
+      3: {DAMAGE: 8, HEALTH: 4}
   abyss:
     name: "&8☠ Abyss"
     icon: ECHO_SHARD
+    aura: {particle: SOUL, style: HALO}
     bonuses:
-      2: {BOSS_CONTRIBUTION: 3}
-      3: {BOSS_CONTRIBUTION: 6, MATERIAL_LUCK: 5}
-      4: {BOSS_CONTRIBUTION: 10, EVENT_POINTS: 5}
+      2: {ARMOR: 2}
+      3: {ARMOR: 3, HEALTH: 6, DAMAGE: 4}
+  fortune:
+    name: "&6$ Fortune"
+    icon: GOLD_INGOT
+    aura: {particle: HAPPY_VILLAGER, style: ORBIT}
+    bonuses:
+      2: {HEALTH: 4}
+      3: {HEALTH: 8, ARMOR: 1}
+  astral:
+    name: "&d✦ Astral"
+    icon: AMETHYST_SHARD
+    aura: {particle: PORTAL, style: RING}
+    bonuses:
+      2: {SPEED: 3}
+      3: {SPEED: 5, DAMAGE: 4}
 
 # ------------------------------------------------------------
 # 20 Di Vật.
-#  trigger: BLOCK_BREAK | MOB_KILL | BOSS_KILL | QUEST_COMPLETE | EVENT_JOIN | ONLINE_MINUTE
-#  charge-needed: số lần trigger để kích hoạt 1 lần thưởng
-#  reward: shard/dust/core nhận được. reward-commands: lệnh console (dùng %player%)
-#  QUEST_COMPLETE / EVENT_JOIN do plugin nhiệm vụ/sự kiện của bạn gọi:
-#     /relicadmin trigger %player% QUEST_COMPLETE 1
+#  group : ATTACK | GUARD | VITAL | SWIFT | MINER | MYSTIC
+#  stats : HEALTH | DAMAGE | ARMOR | SPEED (giá trị ở cấp 1, tăng theo level-scale)
+#  passive (nội tại ẩn, chỉ hiện khi đạt unlock-level):
+#     type: LIFESTEAL THORNS CRIT DODGE EXECUTE BOSS_SLAYER LAST_STAND
+#           KILL_SPEED HASTE KILL_HEAL LOW_HP_GUARD MATERIAL_LUCK FALL_GUARD REGEN
+#     value, chance (CRIT/DODGE), cooldown (giây), unlock-level
+#  aura  : particle (tên Particle), style (RING ORBIT HALO HELIX SPARK TRAIL),
+#          color "#RRGGBB" (chỉ dùng khi particle là DUST)
 # ------------------------------------------------------------
 relics:
-  # ---------- KHAI THÁC ----------
+  # ---------- THỢ MỎ (Frostborn) ----------
   earthcore:
     name: "Lõi Địa Mạch"
     rarity: RARE
-    group: MINING
+    group: MINER
     set: frostborn
     icon: AMETHYST_SHARD
-    description: ["Tích lũy năng lượng khi đào block.", "Đầy năng lượng sẽ nhận nguyên liệu."]
-    stats: {MINING_EXP: 4}
-    trigger: BLOCK_BREAK
-    charge-needed: 300
-    reward: {dust: 3}
+    description: ["Năng lượng của lòng đất", "chảy trong từng nhát cuốc."]
+    stats: {HEALTH: 4, ARMOR: 1}
+    passive: {type: HASTE, value: 0, unlock-level: 10}
+    aura: {particle: DUST, style: RING, color: "#55FF55"}
   resonance_crystal:
     name: "Tinh Thể Cộng Hưởng"
     rarity: EPIC
-    group: MINING
+    group: MINER
     set: frostborn
     icon: PRISMARINE_CRYSTALS
-    description: ["Đào liên tục để cộng dồn Resonance.", "Đạt mốc sẽ kích hoạt thưởng khai thác."]
-    stats: {MINING_EXP: 4, EVENT_POINTS: 3, BOSS_CONTRIBUTION: 2}
-    trigger: BLOCK_BREAK
-    charge-needed: 500
-    reward: {dust: 5, shard: 1}
+    description: ["Tinh thể rung theo nhịp đào,", "hút nguyên liệu về phía bạn."]
+    stats: {DAMAGE: 3, SPEED: 2, HEALTH: 2}
+    passive: {type: MATERIAL_LUCK, value: 8, unlock-level: 10}
+    aura: {particle: END_ROD, style: ORBIT}
   miner_eye:
     name: "Mắt Thợ Mỏ"
     rarity: RARE
-    group: MINING
+    group: MINER
     set: frostborn
     icon: SPYGLASS
-    description: ["Đôi mắt nhìn thấu lòng đất.", "Tăng may mắn nhận nguyên liệu."]
-    stats: {MINING_EXP: 2, MATERIAL_LUCK: 5}
-    trigger: EVENT_JOIN
-    charge-needed: 2
-    reward: {shard: 2}
+    description: ["Đôi mắt quen với bóng tối", "và những cú rơi sâu trong box."]
+    stats: {HEALTH: 2, SPEED: 3}
+    passive: {type: FALL_GUARD, value: 40, unlock-level: 10}
+    aura: {particle: ENCHANT, style: HALO}
   eternal_gear:
     name: "Bánh Răng Vĩnh Cửu"
     rarity: EPIC
-    group: MINING
+    group: MINER
     set: frostborn
     icon: PISTON
-    description: ["Tích lũy điểm khi đào để vào Mining Rush."]
-    stats: {MINING_EXP: 5}
-    trigger: BLOCK_BREAK
-    charge-needed: 400
-    reward: {dust: 4, shard: 1}
+    description: ["Bánh răng không bao giờ ngừng quay,", "đẩy nhịp đào lên cực nhanh."]
+    stats: {ARMOR: 2, SPEED: 3, DAMAGE: 2}
+    passive: {type: HASTE, value: 1, unlock-level: 12}
+    aura: {particle: ELECTRIC_SPARK, style: HELIX}
+
+  # ---------- CÔNG KÍCH (Infernal) ----------
   volcano_heart:
     name: "Trái Tim Núi Lửa"
     rarity: LEGENDARY
-    group: MINING
+    group: ATTACK
     set: infernal
     icon: MAGMA_BLOCK
-    description: ["Tích lũy nhiệt khi khai thác.", "Đủ nhiệt sẽ phát ra một đợt thưởng."]
-    stats: {MINING_EXP: 6, EVENT_POINTS: 4}
-    trigger: BLOCK_BREAK
-    charge-needed: 800
-    reward: {dust: 8, core: 1}
-
-  # ---------- CHIẾN ĐẤU ----------
+    description: ["Nhịp đập của dung nham,", "nung chảy kẻ yếu máu."]
+    stats: {DAMAGE: 8, HEALTH: 4}
+    passive: {type: EXECUTE, value: 25, unlock-level: 10}
+    aura: {particle: FLAME, style: HELIX}
   blood_heart:
     name: "Huyết Tâm"
     rarity: RARE
-    group: COMBAT
+    group: ATTACK
     set: infernal
     icon: REDSTONE
-    description: ["Chiến đấu để tích lũy Blood Charge."]
-    stats: {COMBAT_EXP: 4}
-    trigger: MOB_KILL
-    charge-needed: 60
-    reward: {dust: 3}
+    description: ["Trái tim đỏ thẫm khao khát máu."]
+    stats: {DAMAGE: 4, HEALTH: 2}
+    passive: {type: LIFESTEAL, value: 4, unlock-level: 10}
+    aura: {particle: DUST, style: SPARK, color: "#CC0000"}
   thunder_core:
     name: "Lôi Hạch"
     rarity: EPIC
-    group: COMBAT
+    group: ATTACK
     set: infernal
     icon: LIGHTNING_ROD
-    description: ["Đạt mốc combo sẽ phát ra hiệu ứng sét", "và thưởng thêm điểm nhiệm vụ."]
-    stats: {COMBAT_EXP: 4, QUEST_POINTS: 3}
-    trigger: MOB_KILL
-    charge-needed: 100
-    reward: {dust: 5, shard: 1}
-  ancient_shield:
-    name: "Khiên Cổ Đại"
-    rarity: RARE
-    group: COMBAT
-    set: abyss
-    icon: SHIELD
-    description: ["Tham gia hoạt động Boss để nhận", "thêm điểm đóng góp phòng thủ."]
-    stats: {BOSS_CONTRIBUTION: 5, EVENT_POINTS: 2}
-    trigger: BOSS_KILL
-    charge-needed: 3
-    reward: {dust: 5}
+    description: ["Lõi sét nén chặt,", "bùng nổ trong những đòn chí mạng."]
+    stats: {DAMAGE: 5, SPEED: 3}
+    passive: {type: CRIT, value: 50, chance: 15, unlock-level: 10}
+    aura: {particle: ELECTRIC_SPARK, style: ORBIT}
   hunter_soul:
     name: "Linh Hồn Kẻ Săn"
     rarity: COMMON
-    group: COMBAT
+    group: ATTACK
     set: infernal
     icon: SOUL_LANTERN
-    description: ["Hoàn thành nhiệm vụ tiêu diệt quái", "để nhận thêm Hunter EXP."]
-    stats: {COMBAT_EXP: 2}
-    trigger: QUEST_COMPLETE
-    charge-needed: 3
-    reward: {dust: 2}
+    description: ["Linh hồn của những kẻ", "bạn đã hạ gục."]
+    stats: {DAMAGE: 2, HEALTH: 2}
+    passive: {type: KILL_HEAL, value: 1, unlock-level: 8}
+    aura: {particle: SOUL, style: SPARK}
 
-  # ---------- KINH TẾ ----------
-  gold_coin:
-    name: "Đồng Xu Hoàng Kim"
-    rarity: COMMON
-    group: ECONOMY
-    set: fortune
-    icon: GOLD_NUGGET
-    description: ["Tăng nhẹ tiền từ nhiệm vụ."]
-    stats: {MONEY: 2}
-    trigger: QUEST_COMPLETE
-    charge-needed: 5
-    reward: {dust: 2}
-  ancient_chest:
-    name: "Hòm Kho Cổ"
-    rarity: COMMON
-    group: ECONOMY
-    set: fortune
-    icon: CHEST
-    description: ["Tăng điểm tiến trình sưu tầm kho báu."]
-    stats: {TREASURE: 4}
-    trigger: QUEST_COMPLETE
-    charge-needed: 4
-    reward: {shard: 1}
-  merchant_hand:
-    name: "Bàn Tay Thương Nhân"
+  # ---------- PHÒNG THỦ & HUYỀN BÍ (Abyss) ----------
+  ancient_shield:
+    name: "Khiên Cổ Đại"
     rarity: RARE
-    group: ECONOMY
-    set: fortune
-    icon: EMERALD
-    description: ["Bàn tay khéo léo của thương nhân."]
-    stats: {MONEY: 2, MATERIAL_LUCK: 3}
-    trigger: QUEST_COMPLETE
-    charge-needed: 6
-    reward: {dust: 3}
-  fortune_charm:
-    name: "Bùa Tài Lộc"
-    rarity: EPIC
-    group: ECONOMY
-    set: fortune
-    icon: TOTEM_OF_UNDYING
-    description: ["Tăng thưởng một số hợp đồng."]
-    stats: {MONEY: 3, TREASURE: 4, QUEST_POINTS: 3}
-    trigger: QUEST_COMPLETE
-    charge-needed: 8
-    reward: {dust: 5, shard: 1}
-
-  # ---------- TIỆN ÍCH & SỰ KIỆN ----------
-  space_gate:
-    name: "Cổng Không Gian"
-    rarity: EPIC
-    group: UTILITY
-    set: astral
-    icon: END_PORTAL_FRAME
-    description: ["Tham gia sự kiện để tăng tiến trình khám phá."]
-    stats: {EVENT_POINTS: 5, TREASURE: 3}
-    trigger: EVENT_JOIN
-    charge-needed: 2
-    reward: {dust: 5, shard: 1}
-  angel_feather:
-    name: "Lông Vũ Thiên Thần"
-    rarity: RARE
-    group: UTILITY
-    set: astral
-    icon: FEATHER
-    description: ["Hoàn thành nhiệm vụ ngày để nhận thêm", "điểm thưởng vào hệ thống tích lũy."]
-    stats: {QUEST_POINTS: 4}
-    trigger: QUEST_COMPLETE
-    charge-needed: 1
-    reward: {dust: 2}
-  moon_shard:
-    name: "Mảnh Trăng"
-    rarity: RARE
-    group: UTILITY
-    set: astral
-    icon: SEA_LANTERN
-    description: ["Có bonus trong các sự kiện ban đêm."]
-    stats: {EVENT_POINTS: 4}
-    trigger: EVENT_JOIN
-    charge-needed: 3
-    reward: {shard: 2}
+    group: GUARD
+    set: abyss
+    icon: SHIELD
+    description: ["Tấm khiên từ thời cổ xưa,", "càng nguy cấp càng cứng."]
+    stats: {ARMOR: 3, HEALTH: 4}
+    passive: {type: LOW_HP_GUARD, value: 15, unlock-level: 10}
+    aura: {particle: DUST, style: RING, color: "#AAAAAA"}
   void_eye:
     name: "Mắt Hư Không"
     rarity: LEGENDARY
-    group: UTILITY
+    group: MYSTIC
     set: abyss
     icon: ENDER_EYE
-    description: ["Nhìn thấu hư không, đón đầu sự kiện hiếm."]
-    stats: {EVENT_POINTS: 6, BOSS_CONTRIBUTION: 5, MATERIAL_LUCK: 8}
-    trigger: BOSS_KILL
-    charge-needed: 5
-    reward: {dust: 8, core: 1}
-
-  # ---------- VUI VẺ & ĐỘC LẠ ----------
-  astral_battery:
-    name: "Cục Pin Astral"
-    rarity: COMMON
-    group: FUN
-    set: astral
-    icon: REDSTONE_LAMP
-    description: ["Tích lũy năng lượng khi online", "và đổi thành nguyên liệu."]
-    stats: {MATERIAL_LUCK: 3}
-    trigger: ONLINE_MINUTE
-    charge-needed: 30
-    reward: {dust: 2}
+    description: ["Nhìn thấu hư không,", "khiến Boss run sợ."]
+    stats: {DAMAGE: 5, ARMOR: 3, HEALTH: 4}
+    passive: {type: BOSS_SLAYER, value: 20, unlock-level: 10}
+    aura: {particle: PORTAL, style: HALO}
   astrax_heart:
     name: "Trái Tim Astrax"
     rarity: MYTHIC
-    group: FUN
+    group: MYSTIC
     set: abyss
     icon: HEART_OF_THE_SEA
-    description: ["Di Vật độc quyền dành cho", "người chơi lâu năm của AstraxBox."]
-    stats: {MINING_EXP: 5, COMBAT_EXP: 5, EVENT_POINTS: 5, QUEST_POINTS: 5, MATERIAL_LUCK: 10}
-    trigger: ONLINE_MINUTE
-    charge-needed: 60
-    reward: {dust: 6, core: 1}
+    description: ["Di Vật độc quyền của AstraxBox.", "Không chịu gục ngã."]
+    stats: {HEALTH: 12, DAMAGE: 8, ARMOR: 4, SPEED: 4}
+    passive: {type: LAST_STAND, value: 10, cooldown: 240, unlock-level: 15}
+    aura: {particle: TOTEM_OF_UNDYING, style: HELIX}
   lost_relic:
     name: "Di Vật Thất Lạc"
     rarity: CELESTIAL
-    group: FUN
+    group: MYSTIC
     set: abyss
     icon: NETHER_STAR
     description: ["Di Vật ẩn, chỉ tìm được khi", "khám phá các hoạt động đặc biệt."]
-    stats: {EVENT_POINTS: 8, BOSS_CONTRIBUTION: 6, MATERIAL_LUCK: 10, TREASURE: 8}
-    trigger: EVENT_JOIN
-    charge-needed: 5
-    reward: {dust: 10, core: 2}
+    stats: {HEALTH: 14, DAMAGE: 10, ARMOR: 5, SPEED: 5}
+    passive: {type: THORNS, value: 25, unlock-level: 10}
+    aura: {particle: SCULK_SOUL, style: HALO}
+
+  # ---------- SINH LỰC (Fortune) ----------
+  gold_coin:
+    name: "Đồng Xu Hoàng Kim"
+    rarity: COMMON
+    group: VITAL
+    set: fortune
+    icon: GOLD_NUGGET
+    description: ["Đồng xu may mắn,", "mang theo chút vận may."]
+    stats: {HEALTH: 4}
+    passive: {type: MATERIAL_LUCK, value: 3, unlock-level: 8}
+    aura: {particle: DUST, style: SPARK, color: "#FFD700"}
+  ancient_chest:
+    name: "Hòm Kho Cổ"
+    rarity: COMMON
+    group: VITAL
+    set: fortune
+    icon: CHEST
+    description: ["Chiếc rương cũ chứa đầy", "sinh lực tiềm ẩn."]
+    stats: {HEALTH: 4, ARMOR: 1}
+    passive: {type: REGEN, value: 0.5, unlock-level: 8}
+    aura: {particle: WAX_ON, style: RING}
+  merchant_hand:
+    name: "Bàn Tay Thương Nhân"
+    rarity: RARE
+    group: VITAL
+    set: fortune
+    icon: EMERALD
+    description: ["Bàn tay khéo léo,", "luôn tìm ra thứ giá trị."]
+    stats: {HEALTH: 6, SPEED: 2}
+    passive: {type: MATERIAL_LUCK, value: 6, unlock-level: 10}
+    aura: {particle: HAPPY_VILLAGER, style: TRAIL}
+  fortune_charm:
+    name: "Bùa Tài Lộc"
+    rarity: EPIC
+    group: VITAL
+    set: fortune
+    icon: TOTEM_OF_UNDYING
+    description: ["Lá bùa may mắn,", "đôi khi đòn đánh chỉ lướt qua bạn."]
+    stats: {HEALTH: 8, DAMAGE: 2, ARMOR: 1}
+    passive: {type: DODGE, chance: 8, unlock-level: 10}
+    aura: {particle: TOTEM_OF_UNDYING, style: ORBIT}
+
+  # ---------- TỐC ĐỘ (Astral) ----------
+  space_gate:
+    name: "Cổng Không Gian"
+    rarity: EPIC
+    group: SWIFT
+    set: astral
+    icon: END_PORTAL_FRAME
+    description: ["Cánh cổng mở ra sau mỗi", "lần bạn hạ gục kẻ địch."]
+    stats: {SPEED: 6, HEALTH: 4}
+    passive: {type: KILL_SPEED, value: 4, unlock-level: 10}
+    aura: {particle: PORTAL, style: HELIX}
+  angel_feather:
+    name: "Lông Vũ Thiên Thần"
+    rarity: RARE
+    group: SWIFT
+    set: astral
+    icon: FEATHER
+    description: ["Nhẹ như lông vũ,", "tiếp đất êm như mây."]
+    stats: {SPEED: 4, HEALTH: 3}
+    passive: {type: FALL_GUARD, value: 70, unlock-level: 10}
+    aura: {particle: CLOUD, style: TRAIL}
+  moon_shard:
+    name: "Mảnh Trăng"
+    rarity: RARE
+    group: SWIFT
+    set: astral
+    icon: SEA_LANTERN
+    description: ["Mảnh trăng lấp lánh,", "bóng bạn khó bị chạm tới."]
+    stats: {SPEED: 3, DAMAGE: 3, ARMOR: 1}
+    passive: {type: DODGE, chance: 6, unlock-level: 10}
+    aura: {particle: END_ROD, style: HALO}
+  astral_battery:
+    name: "Cục Pin Astral"
+    rarity: COMMON
+    group: SWIFT
+    set: astral
+    icon: REDSTONE_LAMP
+    description: ["Năng lượng Astral", "âm thầm hồi sức cho bạn."]
+    stats: {SPEED: 2, HEALTH: 2}
+    passive: {type: REGEN, value: 0.5, unlock-level: 8}
+    aura: {particle: ENCHANT, style: SPARK}
