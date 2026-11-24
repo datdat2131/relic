@@ -47,6 +47,7 @@ public final class RelicListener implements Listener {
         PlayerData d = plugin.manager().data(e.getPlayer());
         d.name = e.getPlayer().getName();
         plugin.manager().refresh(e.getPlayer());
+        plugin.manager().showRush(e.getPlayer());
     }
 
     @EventHandler
@@ -66,6 +67,7 @@ public final class RelicListener implements Listener {
         if (p.getGameMode() == GameMode.CREATIVE) return;
         if (!plugin.manager().isMineable(e.getBlock().getType())) return;
         plugin.manager().rollDrops(p, "block-break");
+        plugin.manager().countBlock(p, e.getBlock().getY());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -75,8 +77,16 @@ public final class RelicListener implements Listener {
         Player killer = ent.getKiller();
         if (killer == null) return;
         RelicManager m = plugin.manager();
-        m.rollDrops(killer, m.isBoss(ent) ? "boss-kill" : "mob-kill");
+        boolean boss = m.isBoss(ent);
+        String src = boss ? "boss-kill" : "mob-kill";
+        m.rollDrops(killer, src);
+        for (ActivePassive a : m.passives(m.data(killer))) {
+            if (a.type == Passive.PLUNDER && ThreadLocalRandom.current().nextDouble() * 100.0 < Math.min(100.0, a.value)) {
+                m.rollDrops(killer, src);
+            }
+        }
         m.onKill(killer);
+        m.countKill(killer, boss);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -102,6 +112,14 @@ public final class RelicListener implements Listener {
                         vp.sendActionBar(AstraxRelic.c("&b✦ Né tránh!"));
                         vp.playSound(vp.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.5f, 1.7f);
                         return;
+                    }
+                }
+                for (ActivePassive a : vps) {
+                    if (a.type == Passive.SHIELD && m.tryUse(vd, a)) {
+                        e.setDamage(e.getDamage() * (1.0 - Math.min(100.0, a.value) / 100.0));
+                        vp.sendActionBar(AstraxRelic.c("&b✦ Khiên Năng Lượng chặn đòn!"));
+                        vp.playSound(vp.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.7f, 1.3f);
+                        break;
                     }
                 }
                 if (vp.getHealth() < m.maxHealth(vp) * 0.4) {
@@ -140,6 +158,7 @@ public final class RelicListener implements Listener {
                 PlayerData ad = m.data(atk);
                 double pct = m.bonus(ad, Stat.DAMAGE);
                 boolean crit = false;
+                int comboNow = 0;
                 double lifesteal = 0;
                 for (ActivePassive a : m.passives(ad)) {
                     switch (a.type) {
@@ -156,11 +175,26 @@ public final class RelicListener implements Listener {
                             if (m.isBoss(target)) pct += a.value;
                         }
                         case LIFESTEAL -> lifesteal += a.value;
+                        case COMBO -> {
+                            long now = System.currentTimeMillis();
+                            synchronized (ad) {
+                                if (now - ad.lastHitMs > a.cooldown * 1000L) ad.combo = 0;
+                                ad.combo = Math.min((int) a.chance, ad.combo + 1);
+                                ad.lastHitMs = now;
+                                comboNow = ad.combo;
+                            }
+                            pct += a.value * comboNow;
+                        }
+                        case RAGE -> {
+                            double frac = atk.getHealth() / m.maxHealth(atk);
+                            if (frac < 0.5) pct += a.value * (1.0 - frac / 0.5);
+                        }
                         default -> { }
                     }
                 }
                 if (pct != 0) e.setDamage(e.getDamage() * Math.max(0.0, 1.0 + pct / 100.0));
                 if (lifesteal > 0) m.heal(atk, Math.min(m.lifestealCap, e.getDamage() * lifesteal / 100.0));
+                if (comboNow >= 3) atk.sendActionBar(AstraxRelic.c("&6✦ Bão Đòn x" + comboNow));
                 if (crit) {
                     target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 1, 0), 15, 0.3, 0.3, 0.3, 0.2);
                 }

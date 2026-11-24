@@ -3,15 +3,17 @@ package com.astraxbox.relic;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Color;
 import org.bukkit.Material;
-import org.bukkit.Particle;
 
 /** Các kiểu dữ liệu dùng chung của AstraxRelic. */
 public final class Model {
@@ -33,7 +35,7 @@ public final class Model {
         }
 
         public String line(double v) {
-            return "+" + RelicManager.fmt(v) + (percent ? "%" : "") + " " + display;
+            return (v >= 0 ? "+" : "") + RelicManager.fmt(v) + (percent ? "%" : "") + " " + display;
         }
 
         public static Stat parse(String s) {
@@ -58,7 +60,11 @@ public final class Model {
         LOW_HP_GUARD("Hộ Thể", true),
         MATERIAL_LUCK("Nhà Giả Kim", true),
         FALL_GUARD("Tiếp Đất Nhẹ", true),
-        REGEN("Hồi Phục", true);
+        REGEN("Hồi Phục", true),
+        COMBO("Bão Đòn", true),
+        SHIELD("Khiên Năng Lượng", true),
+        RAGE("Cuồng Nộ", true),
+        PLUNDER("Cướp Đoạt", true);
 
         public final String display;
         public final boolean scales;
@@ -85,21 +91,24 @@ public final class Model {
                 case MATERIAL_LUCK -> "+" + f + "% tỉ lệ rơi nguyên liệu Relic";
                 case FALL_GUARD -> "Giảm " + f + "% sát thương rơi";
                 case REGEN -> "Hồi " + f + " máu mỗi 5 giây";
+                case COMBO -> "Mỗi đòn liên tiếp +" + f + "% sát thương, tối đa " + (int) chance + " lớp (mất sau " + cd + "s không đánh)";
+                case SHIELD -> "Chặn " + RelicManager.fmt(Math.min(100.0, v)) + "% sát thương của một đòn, hồi lại sau " + cd + "s";
+                case RAGE -> "Máu dưới 50%: tăng tới +" + f + "% sát thương (càng thấp càng mạnh)";
+                case PLUNDER -> f + "% cơ hội nhận thêm một lần rơi nguyên liệu khi hạ mục tiêu";
             };
         }
     }
 
-    public enum AuraStyle {
-        RING("Vòng sáng quanh chân"),
-        ORBIT("Quả cầu xoay quanh người"),
-        HALO("Vầng hào quang trên đầu"),
-        HELIX("Xoắn ốc quanh người"),
-        SPARK("Tia sáng lấp lánh"),
-        TRAIL("Vệt đuôi khi di chuyển");
+    /** Kiểu bay của vật phẩm mini quanh người chơi. */
+    public enum OrbitStyle {
+        ORBIT("Bay vòng quanh ngực"),
+        HALO("Xoay trên đầu"),
+        FEET("Xoay quanh chân"),
+        WING("Lơ lửng sau lưng như đôi cánh");
 
         public final String display;
 
-        AuraStyle(String display) { this.display = display; }
+        OrbitStyle(String display) { this.display = display; }
     }
 
     public enum Rarity { COMMON, RARE, EPIC, LEGENDARY, MYTHIC, CELESTIAL }
@@ -111,13 +120,14 @@ public final class Model {
         public int craftShards;
         public int craftCores;
         public int milestoneCores;
+        public int sockets = 1;
         public double costMult = 1.0;
     }
 
-    public static final class AuraDef {
-        public Particle particle = Particle.END_ROD;
-        public AuraStyle style = AuraStyle.RING;
-        public Color color;
+    public static final class OrbitDef {
+        public Material item = Material.PAPER;
+        public OrbitStyle style = OrbitStyle.ORBIT;
+        public float scale = 0.35f;
     }
 
     public static final class PassiveDef {
@@ -145,6 +155,31 @@ public final class Model {
         }
     }
 
+    /** Lời nguyền: một chỉ số bị trừ cố định (không tăng theo cấp). */
+    public static final class CurseDef {
+        public Model.Stat stat;
+        public double value;
+        public String text = "";
+    }
+
+    /** Điều kiện khám phá Relic ẩn. */
+    public static final class DiscoverDef {
+        public String type = "EVENT"; // BLOCKS DEEP_BLOCKS BOSS_KILLS MOB_KILLS OWN_SET RELIC_LEVEL EVENT
+        public double value;
+        public String set = "";
+        public String relic = "";
+    }
+
+    public static final class GemDef {
+        public String id;
+        public String name;
+        public Stat stat;
+        public double value;
+        public int costDust;
+        public int costCore;
+        public Material icon = Material.EMERALD;
+    }
+
     public static final class RelicDef {
         public String id;
         public String name;
@@ -155,14 +190,27 @@ public final class Model {
         public List<String> description = new ArrayList<>();
         public Map<Stat, Double> stats = new EnumMap<>(Stat.class);
         public PassiveDef passive;
-        public AuraDef aura;
+        public OrbitDef orbit;
+        public CurseDef curse;
+        public boolean hidden;
+        public String hint = "";
+        public DiscoverDef discover;
+    }
+
+    /** Cộng hưởng cặp: trang bị đủ các Relic trong danh sách sẽ nhận thêm chỉ số / nội tại. */
+    public static final class Synergy {
+        public String id;
+        public String name;
+        public List<String> relics = new ArrayList<>();
+        public Map<Stat, Double> stats = new EnumMap<>(Stat.class);
+        public PassiveDef passive;
     }
 
     public static final class RelicSet {
         public String id;
         public String name;
         public Material icon = Material.AMETHYST_SHARD;
-        public AuraDef aura;
+        public Color glow;
         public TreeMap<Integer, Map<Stat, Double>> bonuses = new TreeMap<>();
     }
 
@@ -173,6 +221,28 @@ public final class Model {
         public int max = 1;
     }
 
+    /** Hồ sơ lịch sử của một Relic: ngày thức tỉnh, thống kê khi trang bị, ký ức, gem. */
+    public static final class RelicRecord {
+        public long foundAt;
+        public int blocks;
+        public int bosses;
+        public int mobs;
+        public final Map<String, Long> memory = new LinkedHashMap<>();
+        public final String[] gems = new String[3];
+
+        public RelicRecord(long foundAt) { this.foundAt = foundAt; }
+
+        public RelicRecord copy() {
+            RelicRecord c = new RelicRecord(foundAt);
+            c.blocks = blocks;
+            c.bosses = bosses;
+            c.mobs = mobs;
+            c.memory.putAll(memory);
+            System.arraycopy(gems, 0, c.gems, 0, gems.length);
+            return c;
+        }
+    }
+
     public static final class PlayerData {
         public final UUID uuid;
         public volatile String name;
@@ -181,6 +251,16 @@ public final class Model {
         public int core;
         public final Map<String, Integer> levels = new HashMap<>();
         public final String[] equipped = new String[5];
+        public int bossKills;
+        public int mobKills;
+        public int blocksMined;
+        public int deepBlocks;
+        public boolean slot4;
+        public int combo;
+        public long lastHitMs;
+        public final Map<String, RelicRecord> records = new HashMap<>();
+        public final Set<String> discovered = new HashSet<>();
+        public final Map<String, Integer> gemInv = new HashMap<>();
         public volatile Map<Stat, Double> cache;
         public volatile List<ActivePassive> passiveCache;
         public final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
@@ -235,15 +315,39 @@ public final class Model {
             invalidate();
         }
 
+        public synchronized RelicRecord rec(String id) {
+            return records.computeIfAbsent(id, k -> new RelicRecord(System.currentTimeMillis()));
+        }
+
         public synchronized void setLevel(String id, int level) {
+            boolean isNew = !levels.containsKey(id);
             levels.put(id, level);
+            if (isNew) {
+                RelicRecord r = new RelicRecord(System.currentTimeMillis());
+                r.memory.put("found", r.foundAt);
+                records.put(id, r);
+                discovered.add(id);
+            }
             invalidate();
         }
 
         public synchronized void removeRelic(String id) {
             unequip(id);
             levels.remove(id);
+            records.remove(id);
             invalidate();
+        }
+
+        public synchronized boolean isDiscovered(String id) { return discovered.contains(id) || levels.containsKey(id); }
+
+        public synchronized boolean markDiscovered(String id) { return discovered.add(id); }
+
+        public synchronized int gemCount(String id) { return gemInv.getOrDefault(id, 0); }
+
+        public synchronized void addGem(String id, int n) {
+            int v = gemInv.getOrDefault(id, 0) + n;
+            if (v <= 0) gemInv.remove(id);
+            else gemInv.put(id, v);
         }
 
         public synchronized PlayerData copy() {
@@ -253,6 +357,14 @@ public final class Model {
             c.core = core;
             c.levels.putAll(levels);
             System.arraycopy(equipped, 0, c.equipped, 0, equipped.length);
+            c.bossKills = bossKills;
+            c.mobKills = mobKills;
+            c.blocksMined = blocksMined;
+            c.deepBlocks = deepBlocks;
+            c.slot4 = slot4;
+            for (Map.Entry<String, RelicRecord> e : records.entrySet()) c.records.put(e.getKey(), e.getValue().copy());
+            c.discovered.addAll(discovered);
+            c.gemInv.putAll(gemInv);
             return c;
         }
     }

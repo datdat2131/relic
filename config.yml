@@ -2,18 +2,18 @@
 #  AstraxRelic - Hệ thống Di Vật độc quyền của AstraxBox
 #  Mã màu dùng dấu & (vd: &a, &b, &6).
 #  Buff chỉ gồm: HEALTH (máu, 2 = 1 tim), DAMAGE (%), ARMOR (điểm), SPEED (%)
-#  + Nội tại ẩn (mở khóa theo cấp) + Aura riêng để người khác nhìn thấy.
+#  + Nội tại ẩn (mở khóa theo cấp) + vật phẩm mini bay quanh người để người khác nhìn thấy.
 # ============================================================
 
 messages:
   prefix: "&8[&bAstraxRelic&8] &7"
 
 settings:
-  slots: 3                    # số Di Vật trang bị cùng lúc (1-3)
+  slots: 3                    # số slot thường (1-3). Slot thứ 4 là slot đặc biệt, xem ultimate-quest
   max-level: 30
   level-scale: 0.04           # chỉ số = base * (1 + (level-1) * level-scale)
-  aura-enabled: true          # bật/tắt hiệu ứng particle
   lifesteal-cap-per-hit: 4    # hút máu tối đa mỗi đòn (máu)
+  broadcast-min-rarity: LEGENDARY   # báo cả server khi ai chế tạo Relic từ độ hiếm này (NONE = tắt)
 
 # Trần tổng chỉ số (đã gồm bonus bộ Set) để cân bằng server
 caps:
@@ -21,6 +21,101 @@ caps:
   DAMAGE: 100                 # +100%
   ARMOR: 16
   SPEED: 40                   # +40%
+
+# Vật phẩm mini bay quanh người chơi (thay cho particle)
+orbit:
+  enabled: true
+  update-ticks: 2             # tần suất cập nhật vị trí (tick). Tăng lên nếu server nặng
+  hide-from-owner: false      # true = chỉ người khác thấy, chủ không thấy
+  default-scale: 0.35         # kích thước vật phẩm
+
+# Thử Thách Tối Thượng: hoàn thành TẤT CẢ để mở Slot Relic thứ 4 (Admin cũng có thể cấp:
+#   /relicadmin slot <người> unlock)
+ultimate-quest:
+  enabled: true
+  broadcast: true             # báo cả server khi có người hoàn thành
+  boss-kills: 30
+  mob-kills: 10000
+  blocks-mined: 100000
+  relics-owned: 15            # số Di Vật đang sở hữu
+  relic-max-level: 30         # có ít nhất 1 Di Vật đạt cấp này
+  own-rarity: MYTHIC          # sở hữu ít nhất 1 Di Vật độ hiếm này trở lên (để trống = bỏ qua)
+
+# Relic Rush: sự kiện tăng tỉ lệ rơi nguyên liệu toàn server
+#   Admin bật tay: /relicadmin rush start [phút]   |   tắt: /relicadmin rush stop
+relic-rush:
+  auto: false                 # true = tự động bật định kỳ
+  interval-minutes: 60        # chu kỳ tự động
+  duration-minutes: 10
+  multiplier: 2.0             # nhân tỉ lệ rơi
+  bossbar: true
+
+# Sàn tối thiểu của tổng chỉ số (do Lời nguyền có thể trừ chỉ số)
+floors:
+  HEALTH: -10                 # tối đa bị trừ 10 máu (không xuống dưới 10 máu)
+  DAMAGE: -50
+  ARMOR: -10
+  SPEED: -30
+
+# Khám phá Relic ẩn
+discovery:
+  deep-y: -40                 # block đào ở độ cao Y <= giá trị này tính là "đào sâu" (loại DEEP_BLOCKS)
+
+# Gem khảm vào ổ khảm của Relic. Chế tạo bằng Dust/Core trong GUI Hồ sơ (Q ở Codex).
+# Gem cộng chỉ số cố định, không tăng theo cấp.
+gems:
+  ruby:
+    name: "&cRuby"
+    stat: DAMAGE
+    value: 2
+    cost-dust: 60
+    icon: RED_DYE
+  sapphire:
+    name: "&9Sapphire"
+    stat: ARMOR
+    value: 1
+    cost-dust: 60
+    icon: LAPIS_LAZULI
+  emerald:
+    name: "&aEmerald"
+    stat: HEALTH
+    value: 2
+    cost-dust: 60
+    icon: EMERALD
+  topaz:
+    name: "&eTopaz"
+    stat: SPEED
+    value: 2
+    cost-dust: 60
+    icon: YELLOW_DYE
+  greater_ruby:
+    name: "&c&lRuby Lớn"
+    stat: DAMAGE
+    value: 4
+    cost-dust: 150
+    cost-core: 2
+    icon: REDSTONE_BLOCK
+  greater_sapphire:
+    name: "&9&lSapphire Lớn"
+    stat: ARMOR
+    value: 2
+    cost-dust: 150
+    cost-core: 2
+    icon: LAPIS_BLOCK
+  greater_emerald:
+    name: "&a&lEmerald Lớn"
+    stat: HEALTH
+    value: 4
+    cost-dust: 150
+    cost-core: 2
+    icon: EMERALD_BLOCK
+  greater_topaz:
+    name: "&e&lTopaz Lớn"
+    stat: SPEED
+    value: 4
+    cost-dust: 150
+    cost-core: 2
+    icon: GOLD_BLOCK
 
 upgrade:
   dust-base: 10               # Dust cần = dust-base * (1 + level * dust-growth) * cost-mult
@@ -47,18 +142,21 @@ rarities:
     craft-cores: 0
     cost-mult: 1.0
     milestone-cores: 0        # Core cần khi nâng từ cấp 10, 20
+    sockets: 1                # số ổ khảm Gem (0-3)
   RARE:
     name: "Hiếm"
     color: "&9"
     craft-shards: 50
     cost-mult: 1.5
     milestone-cores: 1
+    sockets: 1
   EPIC:
     name: "Sử Thi"
     color: "&5"
     craft-shards: 120
     cost-mult: 2.2
     milestone-cores: 2
+    sockets: 2
   LEGENDARY:
     name: "Huyền Thoại"
     color: "&6"
@@ -66,6 +164,7 @@ rarities:
     craft-cores: 2
     cost-mult: 3.5
     milestone-cores: 4
+    sockets: 2
   MYTHIC:
     name: "Thần Thoại"
     color: "&c"
@@ -73,12 +172,14 @@ rarities:
     craft-cores: 10
     cost-mult: 5.0
     milestone-cores: 6
+    sockets: 3
   CELESTIAL:
     name: "Thiên Giới"
     color: "&b"
     craftable: false          # chỉ nhận từ sự kiện / Admin
     cost-mult: 7.0
     milestone-cores: 8
+    sockets: 3
 
 # Nguyên liệu rơi (chance 0.01 = 1%). Nội tại MATERIAL_LUCK nhân thêm vào tỉ lệ.
 drops:
@@ -95,44 +196,49 @@ drops:
     shard: {chance: 1.0,  min: 3, max: 6}
     core:  {chance: 0.25, min: 1, max: 2}
 
-# Bộ Relic. Key là số món cần trang bị (tối đa 3 vì chỉ có 3 slot).
-# Trang bị đủ 3 món cùng bộ: nhận bonus + aura riêng của bộ.
+# Bộ Relic. Key là số món cần trang bị (tối đa 4, món thứ 4 cần slot đặc biệt).
+# Từ 3 món cùng bộ: các vật phẩm bay quanh người sẽ phát sáng theo màu của bộ (glow-color).
 sets:
   frostborn:
     name: "&b❄ Frostborn"
     icon: BLUE_ICE
-    aura: {particle: SNOWFLAKE, style: HELIX}
+    glow-color: "#55FFFF"
     bonuses:
       2: {SPEED: 2, HEALTH: 2}
       3: {SPEED: 4, HEALTH: 4, ARMOR: 1}
+      4: {SPEED: 6, HEALTH: 8, ARMOR: 2}
   infernal:
     name: "&c🔥 Infernal"
     icon: MAGMA_CREAM
-    aura: {particle: FLAME, style: RING}
+    glow-color: "#FF5555"
     bonuses:
       2: {DAMAGE: 4}
       3: {DAMAGE: 8, HEALTH: 4}
+      4: {DAMAGE: 14, HEALTH: 6}
   abyss:
     name: "&8☠ Abyss"
     icon: ECHO_SHARD
-    aura: {particle: SOUL, style: HALO}
+    glow-color: "#8855FF"
     bonuses:
       2: {ARMOR: 2}
       3: {ARMOR: 3, HEALTH: 6, DAMAGE: 4}
+      4: {ARMOR: 5, HEALTH: 10, DAMAGE: 8}
   fortune:
     name: "&6$ Fortune"
     icon: GOLD_INGOT
-    aura: {particle: HAPPY_VILLAGER, style: ORBIT}
+    glow-color: "#FFD700"
     bonuses:
       2: {HEALTH: 4}
       3: {HEALTH: 8, ARMOR: 1}
+      4: {HEALTH: 14, ARMOR: 2}
   astral:
     name: "&d✦ Astral"
     icon: AMETHYST_SHARD
-    aura: {particle: PORTAL, style: RING}
+    glow-color: "#FF55FF"
     bonuses:
       2: {SPEED: 3}
       3: {SPEED: 5, DAMAGE: 4}
+      4: {SPEED: 8, DAMAGE: 8}
 
 # ------------------------------------------------------------
 # 20 Di Vật.
@@ -141,9 +247,14 @@ sets:
 #  passive (nội tại ẩn, chỉ hiện khi đạt unlock-level):
 #     type: LIFESTEAL THORNS CRIT DODGE EXECUTE BOSS_SLAYER LAST_STAND
 #           KILL_SPEED HASTE KILL_HEAL LOW_HP_GUARD MATERIAL_LUCK FALL_GUARD REGEN
+#           COMBO (value=%/lớp, chance=số lớp tối đa, cooldown=giây mất lớp)
+#           SHIELD (value=% chặn, cooldown=giây hồi) RAGE (value=% tối đa) PLUNDER (value=% rơi thêm)
 #     value, chance (CRIT/DODGE), cooldown (giây), unlock-level
-#  aura  : particle (tên Particle), style (RING ORBIT HALO HELIX SPARK TRAIL),
-#          color "#RRGGBB" (chỉ dùng khi particle là DUST)
+#  curse : lời nguyền, chỉ số bị trừ cố định {stat, value (âm), text}
+#  hidden/hint/discover : Relic bí ẩn. discover.type: BLOCKS DEEP_BLOCKS BOSS_KILLS MOB_KILLS
+#          OWN_SET (set) RELIC_LEVEL (relic, value) EVENT (Admin cấp bằng /relicadmin discover)
+#  orbit : vật phẩm mini bay quanh người. item (mặc định = icon), style (ORBIT HALO FEET WING),
+#          scale (kích thước, tùy chọn)
 # ------------------------------------------------------------
 relics:
   # ---------- THỢ MỎ (Frostborn) ----------
@@ -156,7 +267,7 @@ relics:
     description: ["Năng lượng của lòng đất", "chảy trong từng nhát cuốc."]
     stats: {HEALTH: 4, ARMOR: 1}
     passive: {type: HASTE, value: 0, unlock-level: 10}
-    aura: {particle: DUST, style: RING, color: "#55FF55"}
+    orbit: {style: FEET}
   resonance_crystal:
     name: "Tinh Thể Cộng Hưởng"
     rarity: EPIC
@@ -166,7 +277,7 @@ relics:
     description: ["Tinh thể rung theo nhịp đào,", "hút nguyên liệu về phía bạn."]
     stats: {DAMAGE: 3, SPEED: 2, HEALTH: 2}
     passive: {type: MATERIAL_LUCK, value: 8, unlock-level: 10}
-    aura: {particle: END_ROD, style: ORBIT}
+    orbit: {style: ORBIT}
   miner_eye:
     name: "Mắt Thợ Mỏ"
     rarity: RARE
@@ -176,7 +287,7 @@ relics:
     description: ["Đôi mắt quen với bóng tối", "và những cú rơi sâu trong box."]
     stats: {HEALTH: 2, SPEED: 3}
     passive: {type: FALL_GUARD, value: 40, unlock-level: 10}
-    aura: {particle: ENCHANT, style: HALO}
+    orbit: {style: HALO}
   eternal_gear:
     name: "Bánh Răng Vĩnh Cửu"
     rarity: EPIC
@@ -186,7 +297,7 @@ relics:
     description: ["Bánh răng không bao giờ ngừng quay,", "đẩy nhịp đào lên cực nhanh."]
     stats: {ARMOR: 2, SPEED: 3, DAMAGE: 2}
     passive: {type: HASTE, value: 1, unlock-level: 12}
-    aura: {particle: ELECTRIC_SPARK, style: HELIX}
+    orbit: {style: WING}
 
   # ---------- CÔNG KÍCH (Infernal) ----------
   volcano_heart:
@@ -198,7 +309,8 @@ relics:
     description: ["Nhịp đập của dung nham,", "nung chảy kẻ yếu máu."]
     stats: {DAMAGE: 8, HEALTH: 4}
     passive: {type: EXECUTE, value: 25, unlock-level: 10}
-    aura: {particle: FLAME, style: HELIX}
+    curse: {stat: ARMOR, value: -2, text: "Dung nham thiêu rụi lớp giáp của bạn."}
+    orbit: {style: WING}
   blood_heart:
     name: "Huyết Tâm"
     rarity: RARE
@@ -208,7 +320,8 @@ relics:
     description: ["Trái tim đỏ thẫm khao khát máu."]
     stats: {DAMAGE: 4, HEALTH: 2}
     passive: {type: LIFESTEAL, value: 4, unlock-level: 10}
-    aura: {particle: DUST, style: SPARK, color: "#CC0000"}
+    curse: {stat: ARMOR, value: -1, text: "Khát máu khiến bạn bỏ quên phòng thủ."}
+    orbit: {style: ORBIT}
   thunder_core:
     name: "Lôi Hạch"
     rarity: EPIC
@@ -218,7 +331,8 @@ relics:
     description: ["Lõi sét nén chặt,", "bùng nổ trong những đòn chí mạng."]
     stats: {DAMAGE: 5, SPEED: 3}
     passive: {type: CRIT, value: 50, chance: 15, unlock-level: 10}
-    aura: {particle: ELECTRIC_SPARK, style: ORBIT}
+    curse: {stat: HEALTH, value: -4, text: "Sét nén chặt đốt cháy sinh lực."}
+    orbit: {style: ORBIT}
   hunter_soul:
     name: "Linh Hồn Kẻ Săn"
     rarity: COMMON
@@ -227,8 +341,8 @@ relics:
     icon: SOUL_LANTERN
     description: ["Linh hồn của những kẻ", "bạn đã hạ gục."]
     stats: {DAMAGE: 2, HEALTH: 2}
-    passive: {type: KILL_HEAL, value: 1, unlock-level: 8}
-    aura: {particle: SOUL, style: SPARK}
+    passive: {type: RAGE, value: 20, unlock-level: 8}
+    orbit: {style: ORBIT}
 
   # ---------- PHÒNG THỦ & HUYỀN BÍ (Abyss) ----------
   ancient_shield:
@@ -240,7 +354,8 @@ relics:
     description: ["Tấm khiên từ thời cổ xưa,", "càng nguy cấp càng cứng."]
     stats: {ARMOR: 3, HEALTH: 4}
     passive: {type: LOW_HP_GUARD, value: 15, unlock-level: 10}
-    aura: {particle: DUST, style: RING, color: "#AAAAAA"}
+    curse: {stat: SPEED, value: -3, text: "Tấm khiên quá nặng với người đeo."}
+    orbit: {style: FEET}
   void_eye:
     name: "Mắt Hư Không"
     rarity: LEGENDARY
@@ -250,7 +365,8 @@ relics:
     description: ["Nhìn thấu hư không,", "khiến Boss run sợ."]
     stats: {DAMAGE: 5, ARMOR: 3, HEALTH: 4}
     passive: {type: BOSS_SLAYER, value: 20, unlock-level: 10}
-    aura: {particle: PORTAL, style: HALO}
+    curse: {stat: SPEED, value: -3, text: "Hư không níu chân người nhìn vào nó."}
+    orbit: {style: HALO}
   astrax_heart:
     name: "Trái Tim Astrax"
     rarity: MYTHIC
@@ -260,7 +376,7 @@ relics:
     description: ["Di Vật độc quyền của AstraxBox.", "Không chịu gục ngã."]
     stats: {HEALTH: 12, DAMAGE: 8, ARMOR: 4, SPEED: 4}
     passive: {type: LAST_STAND, value: 10, cooldown: 240, unlock-level: 15}
-    aura: {particle: TOTEM_OF_UNDYING, style: HELIX}
+    orbit: {style: WING}
   lost_relic:
     name: "Di Vật Thất Lạc"
     rarity: CELESTIAL
@@ -268,9 +384,12 @@ relics:
     set: abyss
     icon: NETHER_STAR
     description: ["Di Vật ẩn, chỉ tìm được khi", "khám phá các hoạt động đặc biệt."]
+    hidden: true
+    hint: "Chỉ những người được sự kiện chọn mới tìm thấy nó."
+    discover: {type: EVENT}
     stats: {HEALTH: 14, DAMAGE: 10, ARMOR: 5, SPEED: 5}
     passive: {type: THORNS, value: 25, unlock-level: 10}
-    aura: {particle: SCULK_SOUL, style: HALO}
+    orbit: {style: HALO}
 
   # ---------- SINH LỰC (Fortune) ----------
   gold_coin:
@@ -281,8 +400,8 @@ relics:
     icon: GOLD_NUGGET
     description: ["Đồng xu may mắn,", "mang theo chút vận may."]
     stats: {HEALTH: 4}
-    passive: {type: MATERIAL_LUCK, value: 3, unlock-level: 8}
-    aura: {particle: DUST, style: SPARK, color: "#FFD700"}
+    passive: {type: PLUNDER, value: 10, unlock-level: 8}
+    orbit: {style: ORBIT}
   ancient_chest:
     name: "Hòm Kho Cổ"
     rarity: COMMON
@@ -291,8 +410,8 @@ relics:
     icon: CHEST
     description: ["Chiếc rương cũ chứa đầy", "sinh lực tiềm ẩn."]
     stats: {HEALTH: 4, ARMOR: 1}
-    passive: {type: REGEN, value: 0.5, unlock-level: 8}
-    aura: {particle: WAX_ON, style: RING}
+    passive: {type: SHIELD, value: 50, cooldown: 15, unlock-level: 8}
+    orbit: {style: FEET}
   merchant_hand:
     name: "Bàn Tay Thương Nhân"
     rarity: RARE
@@ -302,7 +421,7 @@ relics:
     description: ["Bàn tay khéo léo,", "luôn tìm ra thứ giá trị."]
     stats: {HEALTH: 6, SPEED: 2}
     passive: {type: MATERIAL_LUCK, value: 6, unlock-level: 10}
-    aura: {particle: HAPPY_VILLAGER, style: TRAIL}
+    orbit: {style: WING}
   fortune_charm:
     name: "Bùa Tài Lộc"
     rarity: EPIC
@@ -312,7 +431,8 @@ relics:
     description: ["Lá bùa may mắn,", "đôi khi đòn đánh chỉ lướt qua bạn."]
     stats: {HEALTH: 8, DAMAGE: 2, ARMOR: 1}
     passive: {type: DODGE, chance: 8, unlock-level: 10}
-    aura: {particle: TOTEM_OF_UNDYING, style: ORBIT}
+    curse: {stat: DAMAGE, value: -2, text: "May mắn không đến từ nắm đấm."}
+    orbit: {style: ORBIT}
 
   # ---------- TỐC ĐỘ (Astral) ----------
   space_gate:
@@ -324,7 +444,8 @@ relics:
     description: ["Cánh cổng mở ra sau mỗi", "lần bạn hạ gục kẻ địch."]
     stats: {SPEED: 6, HEALTH: 4}
     passive: {type: KILL_SPEED, value: 4, unlock-level: 10}
-    aura: {particle: PORTAL, style: HELIX}
+    curse: {stat: ARMOR, value: -1, text: "Cánh cổng làm cơ thể bạn mong manh."}
+    orbit: {style: WING}
   angel_feather:
     name: "Lông Vũ Thiên Thần"
     rarity: RARE
@@ -334,7 +455,7 @@ relics:
     description: ["Nhẹ như lông vũ,", "tiếp đất êm như mây."]
     stats: {SPEED: 4, HEALTH: 3}
     passive: {type: FALL_GUARD, value: 70, unlock-level: 10}
-    aura: {particle: CLOUD, style: TRAIL}
+    orbit: {style: WING}
   moon_shard:
     name: "Mảnh Trăng"
     rarity: RARE
@@ -343,8 +464,8 @@ relics:
     icon: SEA_LANTERN
     description: ["Mảnh trăng lấp lánh,", "bóng bạn khó bị chạm tới."]
     stats: {SPEED: 3, DAMAGE: 3, ARMOR: 1}
-    passive: {type: DODGE, chance: 6, unlock-level: 10}
-    aura: {particle: END_ROD, style: HALO}
+    passive: {type: COMBO, value: 2, chance: 8, cooldown: 4, unlock-level: 10}
+    orbit: {style: HALO}
   astral_battery:
     name: "Cục Pin Astral"
     rarity: COMMON
@@ -354,4 +475,93 @@ relics:
     description: ["Năng lượng Astral", "âm thầm hồi sức cho bạn."]
     stats: {SPEED: 2, HEALTH: 2}
     passive: {type: REGEN, value: 0.5, unlock-level: 8}
-    aura: {particle: ENCHANT, style: SPARK}
+    orbit: {style: ORBIT}
+
+  # ---------- RELIC BÍ ẨN (hiện ??? trong Codex cho đến khi khám phá) ----------
+  forgotten_one:
+    name: "Kẻ Bị Lãng Quên"
+    rarity: LEGENDARY
+    group: MYSTIC
+    set: ""
+    icon: SCULK_SHRIEKER
+    hidden: true
+    hint: "Nó chỉ thức tỉnh khi những người thợ mỏ đào sâu vào nơi không ánh sáng."
+    discover: {type: DEEP_BLOCKS, value: 3000}
+    description: ["Thứ bị chôn vùi dưới tầng sâu nhất,", "chờ một người đủ kiên nhẫn."]
+    stats: {HEALTH: 8, DAMAGE: 6, ARMOR: 3}
+    passive: {type: HASTE, value: 2, unlock-level: 10}
+    curse: {stat: SPEED, value: -3, text: "Bóng tối níu chân người mang nó."}
+    orbit: {style: FEET}
+  first_light:
+    name: "Tia Sáng Đầu Tiên"
+    rarity: LEGENDARY
+    group: MINER
+    set: ""
+    icon: BEACON
+    hidden: true
+    hint: "Hoàn thiện bộ Frostborn, và ánh sáng đầu tiên sẽ tìm đến bạn."
+    discover: {type: OWN_SET, set: frostborn}
+    description: ["Ánh sáng đầu tiên chiếu xuống", "những người thợ mỏ đầu tiên."]
+    stats: {HEALTH: 6, SPEED: 6, ARMOR: 2}
+    passive: {type: MATERIAL_LUCK, value: 15, unlock-level: 10}
+    orbit: {style: HALO}
+  eye_of_eternity:
+    name: "Mắt Vĩnh Hằng"
+    rarity: MYTHIC
+    group: MYSTIC
+    set: ""
+    icon: ENDER_EYE
+    hidden: true
+    hint: "Kẻ hạ gục trăm Boss sẽ được vĩnh hằng dõi theo."
+    discover: {type: BOSS_KILLS, value: 100}
+    description: ["Đôi mắt đã chứng kiến", "mọi cuộc chiến vĩ đại."]
+    stats: {DAMAGE: 12, HEALTH: 8, ARMOR: 4, SPEED: 3}
+    passive: {type: BOSS_SLAYER, value: 30, unlock-level: 12}
+    curse: {stat: HEALTH, value: -4, text: "Vĩnh hằng đòi hỏi một phần sinh mệnh."}
+    orbit: {style: ORBIT}
+
+# ------------------------------------------------------------
+# Cộng hưởng cặp: trang bị đủ các Relic trong `relics` sẽ nhận thêm bonuses và/hoặc passive.
+# Xem bằng /relic synergy
+# ------------------------------------------------------------
+synergies:
+  huyet_loi:
+    name: "&cHuyết Lôi"
+    relics: [blood_heart, thunder_core]
+    bonuses: {DAMAGE: 5}
+    passive: {type: LIFESTEAL, value: 4}
+  mach_dap:
+    name: "&aMạch Đập Vĩnh Cửu"
+    relics: [earthcore, eternal_gear]
+    bonuses: {SPEED: 3}
+    passive: {type: HASTE, value: 1}
+  buc_tuong:
+    name: "&7Bức Tường Hư Không"
+    relics: [ancient_shield, void_eye]
+    bonuses: {ARMOR: 3}
+    passive: {type: LOW_HP_GUARD, value: 10}
+  kho_bau:
+    name: "&6Kho Báu Tích Lũy"
+    relics: [gold_coin, ancient_chest]
+    bonuses: {HEALTH: 4}
+    passive: {type: MATERIAL_LUCK, value: 6}
+  buoc_chan:
+    name: "&bBước Chân Thiên Giới"
+    relics: [space_gate, angel_feather]
+    bonuses: {SPEED: 5}
+    passive: {type: FALL_GUARD, value: 100}
+  huyet_nham:
+    name: "&4Huyết Nham"
+    relics: [volcano_heart, hunter_soul]
+    bonuses: {DAMAGE: 4}
+    passive: {type: EXECUTE, value: 15}
+  van_may:
+    name: "&dVận May Dưới Trăng"
+    relics: [fortune_charm, moon_shard]
+    bonuses: {HEALTH: 4}
+    passive: {type: DODGE, chance: 6}
+  ban_nguyen:
+    name: "&5Bản Nguyên"
+    relics: [astrax_heart, lost_relic]
+    bonuses: {HEALTH: 6, DAMAGE: 5, ARMOR: 2, SPEED: 2}
+    passive: {type: CRIT, value: 40, chance: 10}

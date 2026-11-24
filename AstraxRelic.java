@@ -68,14 +68,15 @@ public final class AstraxRelic extends JavaPlugin {
             getLogger().info("Đã kết nối PlaceholderAPI.");
         }
 
-        // Aura mỗi 3 tick
+        // Vật phẩm mini bay quanh người
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             auraTicks++;
-            for (Player p : Bukkit.getOnlinePlayers()) manager.auraTick(p, auraTicks);
-        }, 20L, 3L);
+            for (Player p : Bukkit.getOnlinePlayers()) manager.orbitTick(p, auraTicks);
+        }, 20L, manager.orbitUpdateTicks);
         // Nội tại theo giây (Haste, Hồi Phục)
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             seconds++;
+            manager.rushTick();
             for (Player p : Bukkit.getOnlinePlayers()) manager.secondTick(p, seconds);
         }, 20L, 20L);
         // Tự động lưu mỗi 5 phút
@@ -88,6 +89,8 @@ public final class AstraxRelic extends JavaPlugin {
     public void onDisable() {
         if (manager != null) {
             for (Player p : Bukkit.getOnlinePlayers()) manager.clear(p);
+            manager.clearAllOrbits();
+            manager.hideRushBar();
             manager.saveAll();
         }
         if (store != null) store.close();

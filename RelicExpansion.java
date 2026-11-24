@@ -43,6 +43,8 @@ public final class RelicExpansion extends PlaceholderExpansion {
         String key = params.toLowerCase();
 
         switch (key) {
+            case "rush_active": return String.valueOf(m.isRush());
+            case "rush_left": return String.valueOf(m.rushLeftSec());
             case "shard": return String.valueOf(d.get("shard"));
             case "dust": return String.valueOf(d.get("dust"));
             case "core": return String.valueOf(d.get("core"));
@@ -59,7 +61,7 @@ public final class RelicExpansion extends PlaceholderExpansion {
         if (key.startsWith("slot_")) {
             try {
                 int i = Integer.parseInt(key.substring(5)) - 1;
-                if (i < 0 || i >= m.slots) return "";
+                if (i < 0 || i >= m.slotsFor(d)) return "";
                 String id;
                 synchronized (d) { id = d.equipped[i]; }
                 RelicDef r = id == null ? null : m.relics.get(id);
